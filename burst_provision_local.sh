@@ -14,10 +14,10 @@ have()        { command -v "$1" >/dev/null 2>&1; }
 require_root
 for b in scw jq lsblk blkid mount umount systemctl; do have "$b" || { echo "Missing binary: $b"; exit 1; }; done
 
-# ---------- Defaults ----------
-SIZE_GB=""                                  # REQUIRED
+# ---------- Defaults (edit here to change behavior) ----------
+SIZE_GB=""                                  # REQUIRED CLI arg
 ZONE="${SCW_DEFAULT_ZONE:-nl-ams-1}"        # e.g. nl-ams-1
-NAME="overflow-$(date +%s)"
+NAME_PREFIX="overflow"                      # Used for volume name prefix
 IOPS="5000"                                 # 5000 or 15000
 FS="xfs"                                    # xfs|ext4
 
@@ -27,55 +27,36 @@ OVERFLOW_MOUNT="/srv/overflow"
 DELUGE_USER_SYS="debian-deluged"
 DELUGE_CORE_CONF="/var/lib/deluged/config/core.conf"
 
-WRITE_FSTAB=false
-ENABLE_BURST=false
-SERVER_ID=""
+WRITE_FSTAB=false                            # Toggle to emit fstab entries automatically
+ENABLE_BURST=true                            # Toggle to rewrite Deluge config for burst
+
+SERVER_ID=""                                 # Auto-detected unless set here
 
 usage() {
   cat <<EOF
-Usage: $0 --size-gb <N> [options]
-
-Required:
-  --size-gb N
-
-Optional:
-  --zone Z                 (default: ${ZONE})
-  --name NAME              (default: ${NAME})
-  --iops {5000|15000}      (default: 5000)
-  --fs {xfs|ext4}          (default: xfs)
-  --server-id ID           (auto-detect if possible)
-
-  --downloads DIR          (default: ${DOWNLOAD_DIR})
-  --finished DIR           (default: ${FINISHED_DIR})
-  --overflow-mount DIR     (default: ${OVERFLOW_MOUNT})
-  --write-fstab            Append fstab entries (backup at /etc/fstab.burstbak)
-  --enable-burst           Edit ${DELUGE_CORE_CONF} to use overflow split
+Usage: $0 <size-gb>
+   or: $0 --size-gb <size>
 
 Examples:
-  sudo $0 --size-gb 600 --enable-burst
-  sudo $0 --size-gb 400 --fs ext4 --write-fstab
+  sudo $0 600
+  sudo $0 --size-gb 400
+
+All other knobs are hardcoded at the top of this script; adjust them here when needed.
 EOF
   exit 2
 }
 
 # ---------- Args ----------
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --size-gb)        SIZE_GB="$2"; shift 2;;
-    --zone)           ZONE="$2"; shift 2;;
-    --name)           NAME="$2"; shift 2;;
-    --iops)           IOPS="$2"; shift 2;;
-    --fs)             FS="$2"; shift 2;;
-    --server-id)      SERVER_ID="$2"; shift 2;;
-    --downloads)      DOWNLOAD_DIR="$2"; shift 2;;
-    --finished)       FINISHED_DIR="$2"; shift 2;;
-    --overflow-mount) OVERFLOW_MOUNT="$2"; shift 2;;
-    --write-fstab)    WRITE_FSTAB=true; shift;;
-    --enable-burst)   ENABLE_BURST=true; shift;;
-    -h|--help)        usage;;
-    *) echo "Unknown arg: $1"; usage;;
-  esac
-done
+if [[ $# -eq 1 ]]; then
+  [[ "$1" == "-h" || "$1" == "--help" ]] && usage
+  SIZE_GB="$1"
+elif [[ $# -eq 2 && "$1" == "--size-gb" ]]; then
+  SIZE_GB="$2"
+else
+  usage
+fi
+
+NAME="${NAME_PREFIX}-$(date +%s)"
 [[ -n "${SIZE_GB}" ]] || usage
 [[ "${IOPS}" == "5000" || "${IOPS}" == "15000" ]] || { echo "IOPS must be 5000 or 15000"; exit 1; }
 [[ "${FS}" == "xfs" || "${FS}" == "ext4" ]] || { echo "FS must be xfs or ext4"; exit 1; }

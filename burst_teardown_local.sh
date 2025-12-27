@@ -24,6 +24,8 @@ COMPLETED_SRC="${OVERFLOW_MOUNT}/completed"
 INCOMPLETE_SRC="${OVERFLOW_MOUNT}/incomplete"
 BIND_TARGET="${FINISHED_DIR}/_overflow"
 
+OVERFLOW_FLAG="${OVERFLOW_MOUNT}/.OVERFLOW_ACTIVE"
+
 DELUGE_USER_SYS="debian-deluged"
 DELUGE_CORE_CONF="/var/lib/deluged/config/core.conf"
 
@@ -59,7 +61,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---------- Confirm nothing is left under bind (unless forced) ----------
-if ! $FORCE; then
+if ! $FORCE && [[ -d "${BIND_TARGET}" ]]; then
   if find "${BIND_TARGET}" -mindepth 1 -type f -print -quit 2>/dev/null | grep -q .; then
     die "Files still present under ${BIND_TARGET}. Move them, or re-run with --force."
   fi
@@ -73,6 +75,8 @@ mountpoint -q "${BIND_TARGET}" && umount "${BIND_TARGET}" || true
 
 echo "Unmounting ${OVERFLOW_MOUNT}…"
 mountpoint -q "${OVERFLOW_MOUNT}" && umount "${OVERFLOW_MOUNT}" || true
+
+rm -f "${OVERFLOW_FLAG}"
 
 # ---------- OFFLINE: revert Deluge config ----------
 if [[ -f "${DELUGE_CORE_CONF}" ]]; then
@@ -93,6 +97,7 @@ fi
 # ---------- If no scw, stop here ----------
 if ! have scw; then
   echo "Scaleway CLI not found; skipping detach/delete."
+  rm -f /etc/burst_volume.meta
   exit 0
 fi
 
@@ -104,9 +109,12 @@ if [[ -f /etc/burst_volume.meta ]]; then
 fi
 
 if [[ -z "${VOL_ID}" && -n "${SRC_BEFORE}" ]]; then
-  DEV="$(lsblk -no PKNAME "${SRC_BEFORE}" 2>/dev/null || basename "${SRC_BEFORE}")"
-  SER="$(lsblk -S -o NAME,SERIAL | awk -v d="$(basename "$DEV")" '$1==d{print $2; exit}')"
-  VOL_ID="${SER#volume-}"
+  DEV_REAL="$(readlink -f "${SRC_BEFORE}" || true)"
+  if [[ -n "${DEV_REAL}" ]]; then
+    SER="$(lsblk -no SERIAL "${DEV_REAL}" 2>/dev/null || true)"
+    [[ -z "${SER}" ]] && SER="$(lsblk -S -o NAME,SERIAL | awk -v d="$(basename "${DEV_REAL}")" '$1==d{print $2; exit}')"
+    VOL_ID="${SER#volume-}"
+  fi
 fi
 
 if [[ -z "${VOL_ID}" ]]; then
@@ -115,6 +123,7 @@ fi
 
 if [[ -z "${VOL_ID}" ]]; then
   echo "WARNING: Could not determine Scaleway volume ID automatically. Detach/delete manually if needed."
+  rm -f /etc/burst_volume.meta
   exit 0
 fi
 
@@ -142,8 +151,9 @@ if $DELETE_VOL; then
   echo "Deleting volume ${VOL_ID}…"
   scw block volume delete "${VOL_ID}" zone=${ZONE} >/dev/null
   echo "Deleted."
-  rm -f /etc/burst_volume.meta
 fi
+
+rm -f /etc/burst_volume.meta
 
 # ---------- Clean fstab (optional) ----------
 if $CLEAN_FSTAB; then
