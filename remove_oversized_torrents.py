@@ -29,10 +29,14 @@ def main():
     available_space = get_available_space(DOWNLOAD_PATH)
     print(f"Available disk space: {available_space / (1024**3):.2f} GB")
 
-    for torrent_id, data in torrents.items()
-
-        torrent_id = torrent_id.decode("utf-8")  # Decode torrent ID
-        data = {k.decode("utf-8"): v.decode("utf-8") if isinstance(v, bytes) else v for k, v in data.items()}  # Decode keys and values
+    for torrent_id, data in torrents.items():
+        torrent_id = torrent_id.decode("utf-8") if isinstance(torrent_id, bytes) else torrent_id
+        data = {
+            (k.decode("utf-8") if isinstance(k, bytes) else k): (
+                v.decode("utf-8") if isinstance(v, bytes) else v
+            )
+            for k, v in data.items()
+        }
     
         name = data["name"]  # Now this should work fine
         total_size = data["total_size"]
