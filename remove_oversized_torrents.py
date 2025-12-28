@@ -22,8 +22,10 @@ def main():
     # ✅ Connect to Deluge
     client.connect()
 
-    # ✅ Get all torrents
-    torrents = client.call("core.get_torrents_status", {}, ["name", "total_size", "progress"])
+    # ✅ Get all torrents (both downloading and seeding)
+    torrents = client.call(
+        "core.get_torrents_status", {}, ["name", "total_size", "progress", "files"]
+    )
 
     # ✅ Get available disk space
     available_space = get_available_space(DOWNLOAD_PATH)
@@ -41,6 +43,32 @@ def main():
         name = data["name"]  # Now this should work fine
         total_size = data["total_size"]
         progress = data["progress"]
+        files = data.get("files", [])
+
+        has_blocked_extension = False
+        for file_info in files:
+            # Normalize nested file data
+            normalized = {
+                (k.decode("utf-8") if isinstance(k, bytes) else k): (
+                    v.decode("utf-8") if isinstance(v, bytes) else v
+                )
+                for k, v in file_info.items()
+            }
+
+            file_path = normalized.get("path", "")
+            if isinstance(file_path, bytes):
+                file_path = file_path.decode("utf-8")
+
+            if file_path.lower().endswith((".scr", ".rar")):
+                has_blocked_extension = True
+                break
+
+        if has_blocked_extension:
+            print(
+                f"🚨 Removing torrent: {name} (ID: {torrent_id}) - Contains .scr or .rar file!"
+            )
+            client.call("core.remove_torrent", torrent_id, True)  # True = remove data
+            continue
 
         #debug
         print(f"Processing torrent: {torrent_id}")
