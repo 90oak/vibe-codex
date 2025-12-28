@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Safari Impostor</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #f97316;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, #1f2937, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    main {
+      width: min(960px, 100%);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.9rem;
+      letter-spacing: 0.01em;
+    }
+
+    p.lead {
+      color: var(--muted);
+      margin: 6px 0 0;
+      font-size: 0.98rem;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #0b1020, #0f172a);
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+    }
+
+    section:not(.visible) {
+      display: none;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #111827;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus, button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      border: none;
+      background: linear-gradient(120deg, #f97316, #fb923c);
+      color: #0b1020;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.25);
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 6px 16px rgba(249, 115, 22, 0.18);
+    }
+
+    .muted-button {
+      background: #1f2937;
+      color: var(--text);
+      box-shadow: none;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .names-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #1f2937;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      border: 1px dashed #2d3748;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 12px;
+      background: #111827;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .player-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .player-buttons button {
+      flex: 1 1 140px;
+    }
+
+    .notice {
+      background: #1f2937;
+      border: 1px solid #2d3748;
+      padding: 12px;
+      border-radius: 12px;
+      color: var(--text);
+    }
+
+    .notice strong {
+      color: #fbbf24;
+    }
+
+    .reveal-card {
+      text-align: center;
+      padding: 26px;
+    }
+
+    .reveal-title {
+      margin: 0 0 10px;
+      font-size: 1.4rem;
+    }
+
+    .animal-name {
+      display: inline-block;
+      padding: 10px 18px;
+      background: linear-gradient(120deg, #14b8a6, #22d3ee);
+      color: #0b1020;
+      border-radius: 12px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      margin: 8px 0 12px;
+    }
+
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .list li {
+      padding: 4px 0;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Safari Impostor</h1>
+      <p class="lead">A quick party game for Kruger National Park animal lovers.</p>
+    </header>
+
+    <section id="setup" class="card visible">
+      <div class="section-title">
+        <h2>Setup</h2>
+        <span class="pill">3–10 players · 1–2 impostors</span>
+      </div>
+
+      <div class="grid">
+        <div>
+          <label for="player-count">Number of players</label>
+          <input type="number" id="player-count" min="3" max="10" value="5" />
+        </div>
+        <div>
+          <label for="impostor-count">Number of impostors</label>
+          <select id="impostor-count">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+      </div>
+
+      <label style="margin-top:14px;">Player names (optional)</label>
+      <div id="names" class="names-grid"></div>
+
+      <div class="status" id="setup-tip">Leave blanks to use Player 1, Player 2…</div>
+      <button id="start-btn" style="margin-top:14px;">Start game</button>
+    </section>
+
+    <section id="assign" class="card">
+      <div class="section-title">
+        <h2>Give out clues</h2>
+        <span class="pill" id="round-animal-pill"></span>
+      </div>
+      <div class="notice" id="assign-instructions"></div>
+      <div class="player-buttons" id="assign-buttons"></div>
+      <div class="status" id="assign-status"></div>
+    </section>
+
+    <section id="waiting" class="card">
+      <div class="reveal-card">
+        <h3 class="reveal-title" id="role-title"></h3>
+        <div id="role-detail" class="status" style="margin-top:10px;"></div>
+        <button id="got-it" style="margin-top:16px;">Got it</button>
+      </div>
+    </section>
+
+    <section id="summary" class="card">
+      <div class="reveal-card">
+        <h3 class="reveal-title">All set!</h3>
+        <p id="start-player" class="status"></p>
+        <button id="reveal-btn" style="margin-top:12px;">Reveal impostors</button>
+      </div>
+    </section>
+
+    <section id="reveal" class="card">
+      <div class="reveal-card">
+        <h3 class="reveal-title">Round results</h3>
+        <div class="animal-name" id="reveal-animal"></div>
+        <ul class="list" id="impostor-list"></ul>
+        <button id="play-again" style="margin-top:18px;">Play again</button>
+      </div>
+    </section>
+
+    <p class="footer-note">Built for offline play—save this page to your phone and enjoy!</p>
+  </main>
+
+  <script>
+    const animals = [
+      "African elephant",
+      "African lion",
+      "African wild dog",
+      "Black rhinoceros",
+      "Blue wildebeest",
+      "Cape buffalo",
+      "Cheetah",
+      "Giraffe",
+      "Hippopotamus",
+      "Hyena",
+      "Impala",
+      "Kudu",
+      "Leopard",
+      "Meerkat",
+      "Nile crocodile",
+      "Secretarybird",
+      "Serval",
+      "Spotted bush snake",
+      "Warthog",
+      "Zebra"
+    ];
+
+    const sections = {
+      setup: document.getElementById("setup"),
+      assign: document.getElementById("assign"),
+      waiting: document.getElementById("waiting"),
+      summary: document.getElementById("summary"),
+      reveal: document.getElementById("reveal"),
+    };
+
+    const playerCountInput = document.getElementById("player-count");
+    const impostorCountSelect = document.getElementById("impostor-count");
+    const namesContainer = document.getElementById("names");
+    const startBtn = document.getElementById("start-btn");
+    const assignButtons = document.getElementById("assign-buttons");
+    const assignStatus = document.getElementById("assign-status");
+    const assignInstructions = document.getElementById("assign-instructions");
+    const roundAnimalPill = document.getElementById("round-animal-pill");
+    const roleTitle = document.getElementById("role-title");
+    const roleDetail = document.getElementById("role-detail");
+    const gotItBtn = document.getElementById("got-it");
+    const startPlayer = document.getElementById("start-player");
+    const revealBtn = document.getElementById("reveal-btn");
+    const revealAnimal = document.getElementById("reveal-animal");
+    const impostorList = document.getElementById("impostor-list");
+    const playAgainBtn = document.getElementById("play-again");
+    const setupTip = document.getElementById("setup-tip");
+
+    let currentAnimal = "";
+    let players = [];
+    let assignedCount = 0;
+    let impostorNames = [];
+    let playerOrder = [];
+
+    function setVisible(sectionId) {
+      Object.entries(sections).forEach(([id, el]) => {
+        if (id === sectionId) {
+          el.classList.add("visible");
+          el.style.display = "block";
+        } else {
+          el.classList.remove("visible");
+          el.style.display = "none";
+        }
+      });
+    }
+
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function getQueue() {
+      const stored = localStorage.getItem("safariAnimalQueue");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length) return parsed;
+        } catch (_) {}
+      }
+      const fresh = shuffle(animals);
+      localStorage.setItem("safariAnimalQueue", JSON.stringify(fresh));
+      return fresh;
+    }
+
+    function drawAnimal() {
+      const queue = getQueue();
+      const animal = queue.shift();
+      localStorage.setItem("safariAnimalQueue", JSON.stringify(queue.length ? queue : shuffle(animals)));
+      return animal;
+    }
+
+    function updateNameFields(count) {
+      namesContainer.innerHTML = "";
+      for (let i = 0; i < count; i += 1) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = `Player ${i + 1}`;
+        input.dataset.index = i;
+        namesContainer.appendChild(input);
+      }
+    }
+
+    function generatePlayers() {
+      const count = Number(playerCountInput.value);
+      const impostorCount = Number(impostorCountSelect.value);
+      if (Number.isNaN(count) || count < 3 || count > 10) {
+        alert("Please choose 3 to 10 players.");
+        return false;
+      }
+      if (impostorCount > count - 1) {
+        alert("There must be at least one non-impostor.");
+        return false;
+      }
+
+      const nameInputs = Array.from(namesContainer.querySelectorAll("input"));
+      const rawNames = nameInputs.map((input, idx) => input.value.trim() || `Player ${idx + 1}`);
+      players = rawNames.map((name) => ({ name, role: "" }));
+
+      currentAnimal = drawAnimal();
+      impostorNames = shuffle(players).slice(0, impostorCount).map((p) => p.name);
+      players = players.map((p) => ({ ...p, role: impostorNames.includes(p.name) ? "impostor" : "seer" }));
+      playerOrder = players.map((p) => p.name);
+      assignedCount = 0;
+      roundAnimalPill.textContent = `Round animal chosen`;
+      assignInstructions.innerHTML = `Hand the phone around. Each player taps their name, sees their role, then taps <strong>Got it</strong>.`;
+      renderAssignButtons();
+      assignStatus.textContent = `${players.length} players awaiting their clue.`;
+      setVisible("assign");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    }
+
+    function renderAssignButtons() {
+      assignButtons.innerHTML = "";
+      players.forEach((player) => {
+        const btn = document.createElement("button");
+        btn.textContent = player.name;
+        btn.className = "muted-button";
+        btn.disabled = player.revealed;
+        btn.addEventListener("click", () => revealForPlayer(player));
+        assignButtons.appendChild(btn);
+      });
+    }
+
+    function revealForPlayer(player) {
+      player.revealed = true;
+      roleTitle.textContent = player.role === "impostor" ? "You are the Impostor" : "Your safari clue";
+      if (player.role === "impostor") {
+        roleDetail.textContent = "Blend in and guess the animal before you are found out.";
+      } else {
+        roleDetail.textContent = `Your animal: ${currentAnimal}`;
+      }
+      setVisible("waiting");
+    }
+
+    function handleGotIt() {
+      assignedCount = players.filter((p) => p.revealed).length;
+      const remaining = players.length - assignedCount;
+      assignStatus.textContent = remaining === 0
+        ? "All players have viewed their roles."
+        : `${remaining} player${remaining === 1 ? "" : "s"} still need${remaining === 1 ? "s" : ""} a clue.`;
+      renderAssignButtons();
+      if (remaining === 0) {
+        const starter = players[Math.floor(Math.random() * players.length)].name;
+        startPlayer.textContent = `${starter} starts the discussion.`;
+        setVisible("summary");
+      } else {
+        setVisible("assign");
+      }
+    }
+
+    function revealOutcome() {
+      revealAnimal.textContent = currentAnimal;
+      impostorList.innerHTML = "";
+      impostorNames.forEach((name) => {
+        const li = document.createElement("li");
+        li.textContent = `Impostor: ${name}`;
+        impostorList.appendChild(li);
+      });
+      setVisible("reveal");
+    }
+
+    function resetGame() {
+      playerCountInput.value = Math.min(Math.max(Number(playerCountInput.value) || 5, 3), 10);
+      impostorCountSelect.value = "1";
+      setupTip.textContent = "Leave blanks to use Player 1, Player 2…";
+      updateNameFields(Number(playerCountInput.value));
+      players = [];
+      assignedCount = 0;
+      impostorNames = [];
+      currentAnimal = "";
+      playerOrder = [];
+      setVisible("setup");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    playerCountInput.addEventListener("input", (e) => {
+      const value = Math.min(Math.max(Number(e.target.value) || 3, 3), 10);
+      e.target.value = value;
+      updateNameFields(value);
+      setupTip.textContent = "Names auto-fill if left blank.";
+    });
+
+    startBtn.addEventListener("click", generatePlayers);
+    gotItBtn.addEventListener("click", handleGotIt);
+    revealBtn.addEventListener("click", revealOutcome);
+    playAgainBtn.addEventListener("click", resetGame);
+
+    updateNameFields(Number(playerCountInput.value));
+    setVisible("setup");
+  </script>
+</body>
+</html>
