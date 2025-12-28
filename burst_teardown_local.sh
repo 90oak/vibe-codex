@@ -121,4 +121,7 @@ echo "Deleted."
 
 rm -f /etc/burst_volume.meta
 
+echo "Removing bind target ${BIND_TARGET}…"
+rm -rf "${BIND_TARGET}"
+
 echo "✅ Teardown complete."
