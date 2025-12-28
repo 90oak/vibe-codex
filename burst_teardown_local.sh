@@ -2,8 +2,7 @@
 # Teardown burst storage (LOCAL).
 # - Unbind & unmount
 # - OFFLINE: revert /var/lib/deluged/config/core.conf to base paths
-# - Detach (and optionally delete) the SBS Block Volume
-# - Cleans fstab lines and marker file
+# - Detach and delete the SBS Block Volume (always)
 
 set -euo pipefail
 export PATH=/usr/sbin:/sbin:/usr/bin:/bin:$PATH
@@ -13,8 +12,7 @@ have()        { command -v "$1" >/dev/null 2>&1; }
 die()         { echo "ERROR: $*" >&2; exit 1; }
 
 require_root
-for b in lsblk findmnt mount umount systemctl jq; do have "$b" || { echo "Missing binary: $b"; exit 1; }; done
-have scw || echo "NOTE: scw (Scaleway CLI) not found. Detach/delete will be skipped."
+for b in scw jq lsblk findmnt mount umount systemctl; do have "$b" || { echo "Missing binary: $b"; exit 1; }; done
 
 # ---------- Paths & users ----------
 DOWNLOAD_DIR="/var/lib/deluged/Downloads"
@@ -32,40 +30,19 @@ DELUGE_CORE_CONF="/var/lib/deluged/config/core.conf"
 # ---------- Scaleway ----------
 ZONE="${SCW_DEFAULT_ZONE:-nl-ams-1}"
 SERVER_ID=""
-DELETE_VOL=false
-CLEAN_FSTAB=false
-FORCE=false
 
-usage() {
-  cat <<EOF
-Usage: $0 [options]
-  --delete          Delete the block volume after detaching
-  --clean-fstab     Remove fstab lines for ${OVERFLOW_MOUNT} and ${BIND_TARGET}
-  --force           Proceed even if files remain under ${BIND_TARGET}
-  --zone Z          (default: ${ZONE})
-  --server-id ID
-EOF
-  exit 2
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --delete) DELETE_VOL=true; shift;;
-    --clean-fstab) CLEAN_FSTAB=true; shift;;
-    --force) FORCE=true; shift;;
-    --zone) ZONE="$2"; shift 2;;
-    --server-id) SERVER_ID="$2"; shift 2;;
-    -h|--help) usage;;
-    *) echo "Unknown arg: $1"; usage;;
-  esac
-done
-
-# ---------- Confirm nothing is left under bind (unless forced) ----------
-if ! $FORCE && [[ -d "${BIND_TARGET}" ]]; then
-  if find "${BIND_TARGET}" -mindepth 1 -type f -print -quit 2>/dev/null | grep -q .; then
-    die "Files still present under ${BIND_TARGET}. Move them, or re-run with --force."
+# ---------- Sanity: overflow must be empty ----------
+echo "Checking that overflow directories are empty…"
+if [[ -d "${OVERFLOW_MOUNT}" ]]; then
+  if find "${OVERFLOW_MOUNT}" -mindepth 1 -type f ! -name ".OVERFLOW_ACTIVE" -print -quit | grep -q .; then
+    die "Overflow mount contains files. Remove them before tearing down."
   fi
 fi
+for dir in "${COMPLETED_SRC}" "${INCOMPLETE_SRC}"; do
+  if [[ -d "${dir}" ]] && find "${dir}" -mindepth 1 -print -quit | grep -q .; then
+    die "${dir} is not empty. Move or delete contents before tearing down."
+  fi
+done
 
 # ---------- Capture mount source before unmount ----------
 SRC_BEFORE="$(findmnt -no SOURCE "${OVERFLOW_MOUNT}" 2>/dev/null || true)"
@@ -94,13 +71,6 @@ else
   echo "WARN: ${DELUGE_CORE_CONF} not found; skipping Deluge revert."
 fi
 
-# ---------- If no scw, stop here ----------
-if ! have scw; then
-  echo "Scaleway CLI not found; skipping detach/delete."
-  rm -f /etc/burst_volume.meta
-  exit 0
-fi
-
 # ---------- Determine VOL_ID (marker -> mount -> fallback) ----------
 VOL_ID=""
 if [[ -f /etc/burst_volume.meta ]]; then
@@ -122,9 +92,7 @@ if [[ -z "${VOL_ID}" ]]; then
 fi
 
 if [[ -z "${VOL_ID}" ]]; then
-  echo "WARNING: Could not determine Scaleway volume ID automatically. Detach/delete manually if needed."
-  rm -f /etc/burst_volume.meta
-  exit 0
+  die "Could not determine Scaleway volume ID automatically."
 fi
 
 # ---------- Detect server-id if needed ----------
@@ -139,29 +107,18 @@ if [[ -z "$SERVER_ID" ]]; then
     SERVER_ID="$(scw instance server list zone=${ZONE} -o json | jq -r ".[] | select(.name==\"${HN}\") | .id")" || true
   fi
 fi
-[[ -n "$SERVER_ID" ]] || die "Could not determine server-id; pass --server-id."
+[[ -n "$SERVER_ID" ]] || die "Could not determine server-id."
 
-# ---------- Detach (and optional delete) ----------
+# ---------- Detach and delete ----------
 echo "Detaching volume ${VOL_ID} from server ${SERVER_ID} (zone ${ZONE})…"
 scw instance server detach-volume server-id="${SERVER_ID}" volume-id="${VOL_ID}" zone=${ZONE} >/dev/null
 scw block volume wait "${VOL_ID}" zone=${ZONE} terminal-status=available >/dev/null
 echo "Detached."
 
-if $DELETE_VOL; then
-  echo "Deleting volume ${VOL_ID}…"
-  scw block volume delete "${VOL_ID}" zone=${ZONE} >/dev/null
-  echo "Deleted."
-fi
+echo "Deleting volume ${VOL_ID}…"
+scw block volume delete "${VOL_ID}" zone=${ZONE} >/dev/null
+echo "Deleted."
 
 rm -f /etc/burst_volume.meta
-
-# ---------- Clean fstab (optional) ----------
-if $CLEAN_FSTAB; then
-  echo "Cleaning /etc/fstab entries…"
-  cp -n /etc/fstab /etc/fstab.burstbak 2>/dev/null || true
-  sed -i "\|[[:space:]]${OVERFLOW_MOUNT}[[:space:]]|d" /etc/fstab
-  sed -i "\|[[:space:]]${BIND_TARGET}[[:space:]]|d" /etc/fstab
-  sed -i "\|[[:space:]]${COMPLETED_SRC}[[:space:]]|d" /etc/fstab
-fi
 
 echo "✅ Teardown complete."
