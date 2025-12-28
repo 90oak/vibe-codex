@@ -157,6 +157,17 @@
       flex: 1 1 140px;
     }
 
+    .player-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .player-actions button {
+      flex: 1 1 160px;
+    }
+
     .notice {
       background: #1f2937;
       border: 1px solid #2d3748;
@@ -257,7 +268,10 @@
       <div class="reveal-card">
         <h3 class="reveal-title" id="role-title"></h3>
         <div id="role-detail" class="status" style="margin-top:10px;"></div>
-        <button id="got-it" style="margin-top:16px;">Got it</button>
+        <div class="player-actions">
+          <button id="got-it">Got it</button>
+          <button id="skip-btn" class="muted-button">Skip it</button>
+        </div>
       </div>
     </section>
 
@@ -330,12 +344,15 @@
     const impostorList = document.getElementById("impostor-list");
     const playAgainBtn = document.getElementById("play-again");
     const setupTip = document.getElementById("setup-tip");
+    const skipBtn = document.getElementById("skip-btn");
 
     let currentAnimal = "";
     let players = [];
     let assignedCount = 0;
     let impostorNames = [];
     let playerOrder = [];
+    let lastNames = [];
+    let currentViewer = null;
 
     function setVisible(sectionId) {
       Object.entries(sections).forEach(([id, el]) => {
@@ -378,13 +395,16 @@
       return animal;
     }
 
-    function updateNameFields(count) {
+    function updateNameFields(count, existingNames = []) {
       namesContainer.innerHTML = "";
       for (let i = 0; i < count; i += 1) {
         const input = document.createElement("input");
         input.type = "text";
         input.placeholder = `Player ${i + 1}`;
         input.dataset.index = i;
+        if (existingNames[i]) {
+          input.value = existingNames[i];
+        }
         namesContainer.appendChild(input);
       }
     }
@@ -403,6 +423,7 @@
 
       const nameInputs = Array.from(namesContainer.querySelectorAll("input"));
       const rawNames = nameInputs.map((input, idx) => input.value.trim() || `Player ${idx + 1}`);
+      lastNames = rawNames;
       players = rawNames.map((name) => ({ name, role: "" }));
 
       currentAnimal = drawAnimal();
@@ -414,6 +435,7 @@
       assignInstructions.innerHTML = `Hand the phone around. Each player taps their name, sees their role, then taps <strong>Got it</strong>.`;
       renderAssignButtons();
       assignStatus.textContent = `${players.length} players awaiting their clue.`;
+      currentViewer = null;
       setVisible("assign");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
@@ -432,17 +454,25 @@
     }
 
     function revealForPlayer(player) {
+      currentViewer = player;
       player.revealed = true;
       roleTitle.textContent = player.role === "impostor" ? "You are the Impostor" : "Your safari clue";
       if (player.role === "impostor") {
         roleDetail.textContent = "Blend in and guess the animal before you are found out.";
+        skipBtn.style.display = "none";
       } else {
         roleDetail.textContent = `Your animal: ${currentAnimal}`;
+        const othersRevealed = players.some((p) => p.revealed && p !== player);
+        const canSkip = !othersRevealed;
+        skipBtn.style.display = "block";
+        skipBtn.disabled = !canSkip;
+        skipBtn.title = canSkip ? "" : "Skip is only available before anyone else views the animal.";
       }
       setVisible("waiting");
     }
 
     function handleGotIt() {
+      currentViewer = null;
       assignedCount = players.filter((p) => p.revealed).length;
       const remaining = players.length - assignedCount;
       assignStatus.textContent = remaining === 0
@@ -458,6 +488,18 @@
       }
     }
 
+    function handleSkip() {
+      if (!currentViewer || currentViewer.role === "impostor") return;
+      const othersRevealed = players.some((p) => p.revealed && p !== currentViewer);
+      if (othersRevealed) {
+        alert("Skip is only available before anyone else views the animal.");
+        return;
+      }
+      currentAnimal = drawAnimal();
+      roleDetail.textContent = `Your animal: ${currentAnimal}`;
+      roundAnimalPill.textContent = "New animal chosen";
+    }
+
     function revealOutcome() {
       revealAnimal.textContent = currentAnimal;
       impostorList.innerHTML = "";
@@ -470,15 +512,21 @@
     }
 
     function resetGame() {
-      playerCountInput.value = Math.min(Math.max(Number(playerCountInput.value) || 5, 3), 10);
+      const fallbackCount = Number(playerCountInput.value) || 5;
+      const preferredCount = players.length || lastNames.length || fallbackCount;
+      const safeCount = Math.min(Math.max(preferredCount, 3), 10);
+      playerCountInput.value = safeCount;
       impostorCountSelect.value = "1";
-      setupTip.textContent = "Leave blanks to use Player 1, Player 2…";
-      updateNameFields(Number(playerCountInput.value));
+      setupTip.textContent = lastNames.length
+        ? "Names saved from last round—update or change player count."
+        : "Leave blanks to use Player 1, Player 2…";
+      updateNameFields(safeCount, lastNames);
       players = [];
       assignedCount = 0;
       impostorNames = [];
       currentAnimal = "";
       playerOrder = [];
+      currentViewer = null;
       setVisible("setup");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -486,16 +534,19 @@
     playerCountInput.addEventListener("input", (e) => {
       const value = Math.min(Math.max(Number(e.target.value) || 3, 3), 10);
       e.target.value = value;
-      updateNameFields(value);
-      setupTip.textContent = "Names auto-fill if left blank.";
+      updateNameFields(value, lastNames);
+      setupTip.textContent = lastNames.length
+        ? "Names saved from last round—update as needed."
+        : "Names auto-fill if left blank.";
     });
 
     startBtn.addEventListener("click", generatePlayers);
     gotItBtn.addEventListener("click", handleGotIt);
+    skipBtn.addEventListener("click", handleSkip);
     revealBtn.addEventListener("click", revealOutcome);
     playAgainBtn.addEventListener("click", resetGame);
 
-    updateNameFields(Number(playerCountInput.value));
+    updateNameFields(Number(playerCountInput.value), lastNames);
     setVisible("setup");
   </script>
 </body>
