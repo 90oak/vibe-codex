@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flight Path Globe</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --panel-bg: rgba(18, 18, 22, 0.72);
+      --accent: #00e0ff;
+      --muted: #a7b2c0;
+      --text: #f4f6fb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #05070e;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #globeContainer {
+      position: fixed;
+      inset: 0;
+    }
+
+    #ui {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(960px, calc(100% - 2rem));
+      background: var(--panel-bg);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      border-radius: 18px;
+      padding: 1.25rem 1.5rem 1rem;
+      z-index: 10;
+    }
+
+    #ui h1 {
+      margin: 0 0 0.35rem 0;
+      font-size: clamp(1.1rem, 3vw, 1.4rem);
+      letter-spacing: 0.02em;
+    }
+
+    #ui p {
+      margin: 0.15rem 0 0.75rem 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .inputs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.75rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 0.75rem 0.85rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(12, 12, 16, 0.75);
+      color: var(--text);
+      font-size: 0.98rem;
+      outline: none;
+      transition: border 120ms ease, box-shadow 120ms ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(0, 224, 255, 0.12);
+    }
+
+    button {
+      margin-top: 0.35rem;
+      padding: 0.8rem 1.25rem;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(120deg, #00e0ff, #4df3c9);
+      color: #001018;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 160ms ease;
+      box-shadow: 0 12px 30px rgba(0, 224, 255, 0.25);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    #error {
+      min-height: 1.25rem;
+      color: #ffb1b1;
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ffd166;
+      display: inline-block;
+      box-shadow: 0 0 14px rgba(255, 209, 102, 0.7);
+    }
+
+    @media (max-width: 640px) {
+      #ui {
+        top: 1rem;
+        padding: 1rem 1rem 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="globeContainer"></div>
+
+  <div id="ui">
+    <h1>Direct Flight Path Globe</h1>
+    <p>Enter two airports by name or IATA code, then explore the live day/night globe. Major time zone hubs are highlighted.</p>
+
+    <div class="inputs">
+      <div>
+        <label for="fromInput">Departure airport</label>
+        <input id="fromInput" list="airportOptions" type="text" placeholder="e.g. LAX, Los Angeles" />
+      </div>
+      <div>
+        <label for="toInput">Arrival airport</label>
+        <input id="toInput" list="airportOptions" type="text" placeholder="e.g. JFK, New York" />
+      </div>
+    </div>
+    <datalist id="airportOptions"></datalist>
+    <button id="plotBtn">Show flight path</button>
+    <div id="error"></div>
+    <p class="hint"><span class="legend-dot"></span> One city per time zone is marked with its airport code.</p>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js';
+    import ThreeGlobe from 'https://unpkg.com/three-globe@2.30.0/dist/three-globe.esm.min.js';
+
+    const DAY_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
+    const TOPO_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
+    const NIGHT_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
+    const SKY_TEXTURE = 'https://unpkg.com/three-globe/example/img/night-sky.png';
+
+    const airportData = [
+      { city: 'Auckland', name: 'Auckland Airport', code: 'AKL', country: 'New Zealand', lat: -37.0082, lon: 174.785 },
+      { city: 'Sydney', name: 'Sydney Kingsford Smith', code: 'SYD', country: 'Australia', lat: -33.9399, lon: 151.1753 },
+      { city: 'Tokyo', name: 'Haneda Airport', code: 'HND', country: 'Japan', lat: 35.5494, lon: 139.7798 },
+      { city: 'Seoul', name: 'Incheon International', code: 'ICN', country: 'South Korea', lat: 37.4602, lon: 126.4407 },
+      { city: 'Beijing', name: 'Beijing Capital', code: 'PEK', country: 'China', lat: 40.0799, lon: 116.6031 },
+      { city: 'Shanghai', name: 'Shanghai Pudong', code: 'PVG', country: 'China', lat: 31.1434, lon: 121.8052 },
+      { city: 'Hong Kong', name: 'Hong Kong International', code: 'HKG', country: 'China', lat: 22.308, lon: 113.9185 },
+      { city: 'Bangkok', name: 'Suvarnabhumi', code: 'BKK', country: 'Thailand', lat: 13.690, lon: 100.75 },
+      { city: 'Singapore', name: 'Changi Airport', code: 'SIN', country: 'Singapore', lat: 1.3644, lon: 103.9915 },
+      { city: 'Delhi', name: 'Indira Gandhi', code: 'DEL', country: 'India', lat: 28.5562, lon: 77.1000 },
+      { city: 'Dubai', name: 'Dubai International', code: 'DXB', country: 'UAE', lat: 25.2532, lon: 55.3657 },
+      { city: 'Istanbul', name: 'Istanbul Airport', code: 'IST', country: 'Turkey', lat: 41.262, lon: 28.727 },
+      { city: 'Athens', name: 'Athens International', code: 'ATH', country: 'Greece', lat: 37.9364, lon: 23.9445 },
+      { city: 'Cairo', name: 'Cairo International', code: 'CAI', country: 'Egypt', lat: 30.112, lon: 31.414 },
+      { city: 'Moscow', name: 'Sheremetyevo', code: 'SVO', country: 'Russia', lat: 55.9726, lon: 37.4146 },
+      { city: 'Nairobi', name: 'Jomo Kenyatta', code: 'NBO', country: 'Kenya', lat: -1.3192, lon: 36.9278 },
+      { city: 'Johannesburg', name: 'OR Tambo', code: 'JNB', country: 'South Africa', lat: -26.1337, lon: 28.2420 },
+      { city: 'Paris', name: 'Charles de Gaulle', code: 'CDG', country: 'France', lat: 49.0097, lon: 2.5479 },
+      { city: 'Frankfurt', name: 'Frankfurt Airport', code: 'FRA', country: 'Germany', lat: 50.0379, lon: 8.5622 },
+      { city: 'London', name: 'Heathrow Airport', code: 'LHR', country: 'United Kingdom', lat: 51.4700, lon: -0.4543 },
+      { city: 'Lagos', name: 'Murtala Muhammed', code: 'LOS', country: 'Nigeria', lat: 6.5774, lon: 3.3211 },
+      { city: 'Reykjavík', name: 'Keflavík', code: 'KEF', country: 'Iceland', lat: 63.985, lon: -22.6056 },
+      { city: 'New York', name: 'John F. Kennedy', code: 'JFK', country: 'USA', lat: 40.6413, lon: -73.7781 },
+      { city: 'Washington D.C.', name: 'Dulles', code: 'IAD', country: 'USA', lat: 38.9531, lon: -77.4565 },
+      { city: 'Atlanta', name: 'Hartsfield–Jackson', code: 'ATL', country: 'USA', lat: 33.6407, lon: -84.4277 },
+      { city: 'Chicago', name: "O'Hare", code: 'ORD', country: 'USA', lat: 41.9742, lon: -87.9073 },
+      { city: 'Denver', name: 'Denver International', code: 'DEN', country: 'USA', lat: 39.8561, lon: -104.6737 },
+      { city: 'Dallas', name: 'DFW Airport', code: 'DFW', country: 'USA', lat: 32.8998, lon: -97.0403 },
+      { city: 'Los Angeles', name: 'LAX', code: 'LAX', country: 'USA', lat: 33.9416, lon: -118.4085 },
+      { city: 'San Francisco', name: 'San Francisco', code: 'SFO', country: 'USA', lat: 37.6213, lon: -122.3790 },
+      { city: 'Seattle', name: 'Seattle–Tacoma', code: 'SEA', country: 'USA', lat: 47.4502, lon: -122.3088 },
+      { city: 'Mexico City', name: 'Benito Juárez', code: 'MEX', country: 'Mexico', lat: 19.4361, lon: -99.0719 },
+      { city: 'Toronto', name: 'Toronto Pearson', code: 'YYZ', country: 'Canada', lat: 43.6777, lon: -79.6248 },
+      { city: 'Vancouver', name: 'Vancouver International', code: 'YVR', country: 'Canada', lat: 49.1967, lon: -123.1815 },
+      { city: 'Anchorage', name: 'Ted Stevens Anchorage', code: 'ANC', country: 'USA', lat: 61.1743, lon: -149.9985 },
+      { city: 'Honolulu', name: 'Honolulu International', code: 'HNL', country: 'USA', lat: 21.3187, lon: -157.9225 },
+      { city: 'Buenos Aires', name: 'Ezeiza', code: 'EZE', country: 'Argentina', lat: -34.8222, lon: -58.5358 },
+      { city: 'São Paulo', name: 'Guarulhos', code: 'GRU', country: 'Brazil', lat: -23.4356, lon: -46.4731 },
+      { city: 'Santiago', name: 'Arturo Merino Benítez', code: 'SCL', country: 'Chile', lat: -33.3929, lon: -70.7858 },
+      { city: 'Lima', name: 'Jorge Chávez', code: 'LIM', country: 'Peru', lat: -12.0219, lon: -77.1143 },
+      { city: 'Bogotá', name: 'El Dorado', code: 'BOG', country: 'Colombia', lat: 4.7016, lon: -74.1469 },
+      { city: 'Panama City', name: 'Tocumen', code: 'PTY', country: 'Panama', lat: 9.0714, lon: -79.3835 },
+      { city: 'Madrid', name: 'Madrid-Barajas', code: 'MAD', country: 'Spain', lat: 40.4983, lon: -3.5676 },
+      { city: 'Lisbon', name: 'Lisbon Portela', code: 'LIS', country: 'Portugal', lat: 38.7742, lon: -9.1342 },
+      { city: 'Riyadh', name: 'King Khalid', code: 'RUH', country: 'Saudi Arabia', lat: 24.9576, lon: 46.6988 },
+      { city: 'Karachi', name: 'Jinnah International', code: 'KHI', country: 'Pakistan', lat: 24.9065, lon: 67.1608 },
+      { city: 'Kuala Lumpur', name: 'KLIA', code: 'KUL', country: 'Malaysia', lat: 2.7456, lon: 101.7072 },
+      { city: 'Jakarta', name: 'Soekarno–Hatta', code: 'CGK', country: 'Indonesia', lat: -6.1256, lon: 106.6559 },
+      { city: 'Manila', name: 'Ninoy Aquino', code: 'MNL', country: 'Philippines', lat: 14.5086, lon: 121.0198 },
+      { city: 'Warsaw', name: 'Chopin Airport', code: 'WAW', country: 'Poland', lat: 52.1657, lon: 20.9671 },
+      { city: 'Zurich', name: 'Zurich Airport', code: 'ZRH', country: 'Switzerland', lat: 47.4581, lon: 8.5555 },
+      { city: 'Rome', name: 'Fiumicino', code: 'FCO', country: 'Italy', lat: 41.8003, lon: 12.2389 },
+      { city: 'Stockholm', name: 'Arlanda', code: 'ARN', country: 'Sweden', lat: 59.6519, lon: 17.9186 },
+      { city: 'Oslo', name: 'Gardermoen', code: 'OSL', country: 'Norway', lat: 60.1939, lon: 11.1004 },
+      { city: 'Helsinki', name: 'Helsinki Airport', code: 'HEL', country: 'Finland', lat: 60.3172, lon: 24.9633 },
+      { city: 'Doha', name: 'Hamad International', code: 'DOH', country: 'Qatar', lat: 25.2731, lon: 51.6081 },
+      { city: 'Tehran', name: 'Imam Khomeini', code: 'IKA', country: 'Iran', lat: 35.4161, lon: 51.1522 },
+      { city: 'Casablanca', name: 'Mohammed V', code: 'CMN', country: 'Morocco', lat: 33.3675, lon: -7.58997 },
+      { city: 'Montreal', name: 'Montréal-Trudeau', code: 'YUL', country: 'Canada', lat: 45.4706, lon: -73.7408 },
+      { city: 'Boston', name: 'Logan International', code: 'BOS', country: 'USA', lat: 42.3656, lon: -71.0096 }
+    ];
+
+    const timezoneCities = [
+      { code: 'PPG', label: 'UTC-11 Pago Pago', lat: -14.331, lon: -170.713, type: 'timezone' },
+      { code: 'HNL', label: 'UTC-10 Honolulu', lat: 21.3187, lon: -157.9225, type: 'timezone' },
+      { code: 'ANC', label: 'UTC-09 Anchorage', lat: 61.1743, lon: -149.9985, type: 'timezone' },
+      { code: 'LAX', label: 'UTC-08 Los Angeles', lat: 33.9416, lon: -118.4085, type: 'timezone' },
+      { code: 'DEN', label: 'UTC-07 Denver', lat: 39.8561, lon: -104.6737, type: 'timezone' },
+      { code: 'MEX', label: 'UTC-06 Mexico City', lat: 19.4361, lon: -99.0719, type: 'timezone' },
+      { code: 'JFK', label: 'UTC-05 New York', lat: 40.6413, lon: -73.7781, type: 'timezone' },
+      { code: 'SCL', label: 'UTC-04 Santiago', lat: -33.3929, lon: -70.7858, type: 'timezone' },
+      { code: 'GRU', label: 'UTC-03 São Paulo', lat: -23.4356, lon: -46.4731, type: 'timezone' },
+      { code: 'FEN', label: 'UTC-02 Noronha', lat: -3.854, lon: -32.423, type: 'timezone' },
+      { code: 'PDL', label: 'UTC-01 Ponta Delgada', lat: 37.7412, lon: -25.6979, type: 'timezone' },
+      { code: 'LHR', label: 'UTC+00 London', lat: 51.47, lon: -0.4543, type: 'timezone' },
+      { code: 'FRA', label: 'UTC+01 Frankfurt', lat: 50.0379, lon: 8.5622, type: 'timezone' },
+      { code: 'CAI', label: 'UTC+02 Cairo', lat: 30.112, lon: 31.414, type: 'timezone' },
+      { code: 'IST', label: 'UTC+03 Istanbul', lat: 41.262, lon: 28.727, type: 'timezone' },
+      { code: 'DXB', label: 'UTC+04 Dubai', lat: 25.2532, lon: 55.3657, type: 'timezone' },
+      { code: 'KHI', label: 'UTC+05 Karachi', lat: 24.9065, lon: 67.1608, type: 'timezone' },
+      { code: 'DEL', label: 'UTC+05:30 Delhi', lat: 28.5562, lon: 77.1, type: 'timezone' },
+      { code: 'DAC', label: 'UTC+06 Dhaka', lat: 23.8433, lon: 90.3978, type: 'timezone' },
+      { code: 'BKK', label: 'UTC+07 Bangkok', lat: 13.69, lon: 100.75, type: 'timezone' },
+      { code: 'SIN', label: 'UTC+08 Singapore', lat: 1.3644, lon: 103.9915, type: 'timezone' },
+      { code: 'TYO', label: 'UTC+09 Tokyo', lat: 35.5494, lon: 139.7798, type: 'timezone' },
+      { code: 'SYD', label: 'UTC+10 Sydney', lat: -33.9399, lon: 151.1753, type: 'timezone' },
+      { code: 'NOU', label: 'UTC+11 Nouméa', lat: -22.0146, lon: 166.2127, type: 'timezone' },
+      { code: 'AKL', label: 'UTC+12 Auckland', lat: -37.0082, lon: 174.785, type: 'timezone' }
+    ];
+
+    const container = document.getElementById('globeContainer');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.TextureLoader().load(SKY_TEXTURE);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 0, 300);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.minDistance = 160;
+    controls.maxDistance = 520;
+
+    const globe = new ThreeGlobe()
+      .globeImageUrl(DAY_TEXTURE)
+      .bumpImageUrl(TOPO_TEXTURE)
+      .showAtmosphere(true)
+      .atmosphereColor('#8ddcff')
+      .atmosphereAltitude(0.25)
+      .labelText((d) => d.label ?? d.code ?? '')
+      .labelAltitude((d) => (d.type === 'airport' ? 0.02 : 0.015))
+      .labelSize((d) => (d.type === 'airport' ? 1.9 : 1.4))
+      .labelResolution(4)
+      .labelColor((d) => (d.type === 'airport' ? 'rgba(122, 225, 255, 0.95)' : 'rgba(255, 255, 255, 0.85)'))
+      .pointColor((d) => (d.type === 'airport' ? '#7ae1ff' : '#ffd166'))
+      .pointAltitude(0.01)
+      .pointRadius((d) => (d.type === 'airport' ? 0.9 : 0.6));
+
+    globe.labelsData(timezoneCities);
+    globe.pointsData(timezoneCities);
+
+    scene.add(globe);
+
+    const ambientLight = new THREE.AmbientLight(0x666666);
+    scene.add(ambientLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    scene.add(sunLight);
+
+    const textureLoader = new THREE.TextureLoader();
+    const sunDirection = new THREE.Vector3();
+    const nightTexture = textureLoader.load(NIGHT_TEXTURE);
+
+    const globeMaterial = globe.globeMaterial();
+    globeMaterial.bumpScale = 2.5;
+    globeMaterial.specular = new THREE.Color(0x111111);
+
+    globeMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.nightTexture = { value: nightTexture };
+      shader.uniforms.sunDirection = { value: sunDirection.clone() };
+      globeMaterial.userData.shader = shader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `
+          vec4 dayColor = texture2D(map, vUv);
+          vec4 nightColor = texture2D(nightTexture, vUv);
+          float cosineAngle = dot(normalize(vNormal), normalize(sunDirection));
+          float mixValue = smoothstep(-0.15, 0.25, cosineAngle);
+          vec4 texelColor = mix(nightColor, dayColor, mixValue);
+          diffuseColor *= texelColor;
+        `
+      );
+    };
+
+    function dayOfYear(date) {
+      const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+      const now = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+      return Math.floor((now - start) / 86400000);
+    }
+
+    function computeSunDirection(date = new Date()) {
+      const rad = Math.PI / 180;
+      const decl = 23.44 * rad * Math.sin(((360 / 365) * (dayOfYear(date) - 81)) * rad);
+      const hours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+      const lon = (180 - hours * 15) * rad; // approximate subsolar longitude
+      const lat = decl;
+      return new THREE.Vector3(
+        Math.cos(lat) * Math.cos(lon),
+        Math.sin(lat),
+        Math.cos(lat) * Math.sin(lon)
+      );
+    }
+
+    function updateSunlight() {
+      sunDirection.copy(computeSunDirection());
+      sunLight.position.copy(sunDirection.clone().multiplyScalar(400));
+      if (globeMaterial.userData.shader) {
+        globeMaterial.userData.shader.uniforms.sunDirection.value.copy(sunDirection);
+      }
+    }
+
+    function resize() {
+      const { innerWidth: w, innerHeight: h } = window;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    window.addEventListener('resize', resize);
+
+    function greatCircleDistance(a, b) {
+      const R = 6371; // km
+      const dLat = THREE.MathUtils.degToRad(b.lat - a.lat);
+      const dLon = THREE.MathUtils.degToRad(b.lon - a.lon);
+      const lat1 = THREE.MathUtils.degToRad(a.lat);
+      const lat2 = THREE.MathUtils.degToRad(b.lat);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    }
+
+    function setFlightPath(from, to) {
+      const distance = greatCircleDistance(from, to);
+      const markers = [
+        ...timezoneCities,
+        { ...from, label: from.code, type: 'airport' },
+        { ...to, label: to.code, type: 'airport' }
+      ];
+
+      globe
+        .arcsData([
+          {
+            startLat: from.lat,
+            startLng: from.lon,
+            endLat: to.lat,
+            endLng: to.lon,
+            color: '#00e0ff',
+            distance
+          }
+        ])
+        .arcAltitude((d) => Math.min(0.45, 0.18 + d.distance / 15000))
+        .arcStroke(() => 0.9)
+        .arcColor(() => ['#7ae1ff', '#00ffb8'])
+        .arcDashLength(0.4)
+        .arcDashGap(1)
+        .arcDashInitialGap(() => Math.random())
+        .arcDashAnimateTime(2800)
+        .pointsData(markers)
+        .labelsData(markers);
+    }
+
+    function populateAirportList() {
+      const list = document.getElementById('airportOptions');
+      list.innerHTML = '';
+      airportData.forEach((apt) => {
+        const opt = document.createElement('option');
+        opt.value = apt.code;
+        opt.label = `${apt.name} — ${apt.city}, ${apt.country}`;
+        list.appendChild(opt);
+      });
+    }
+
+    function findAirport(query) {
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) return undefined;
+      const codeCandidate = normalized.split(/[—-]/)[0].trim();
+      return airportData.find((apt) =>
+        apt.code.toLowerCase() === normalized ||
+        apt.code.toLowerCase() === codeCandidate ||
+        apt.name.toLowerCase().includes(normalized) ||
+        apt.city.toLowerCase().includes(normalized)
+      );
+    }
+
+    function handleFlightRequest() {
+      const fromInput = document.getElementById('fromInput').value;
+      const toInput = document.getElementById('toInput').value;
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = '';
+
+      const from = findAirport(fromInput);
+      const to = findAirport(toInput);
+
+      if (!from || !to) {
+        errorEl.textContent = 'Please choose airports from the list or enter a known IATA code.';
+        return;
+      }
+      if (from.code === to.code) {
+        errorEl.textContent = 'Pick two different airports to draw a route.';
+        return;
+      }
+
+      setFlightPath(from, to);
+      errorEl.textContent = `${from.city} (${from.code}) → ${to.city} (${to.code}) shown. Touch or drag to explore the route.`;
+    }
+
+    document.getElementById('plotBtn').addEventListener('click', handleFlightRequest);
+    document.getElementById('fromInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleFlightRequest();
+    });
+    document.getElementById('toInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleFlightRequest();
+    });
+
+    populateAirportList();
+    setFlightPath(airportData.find((a) => a.code === 'LAX'), airportData.find((a) => a.code === 'JFK'));
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateSunlight();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    resize();
+    animate();
+  </script>
+</body>
+</html>
