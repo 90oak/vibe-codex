@@ -33,14 +33,14 @@
 
       #info-panel {
         position: absolute;
-        top: 20px;
-        left: 20px;
-        padding: 16px 18px;
+        top: 18px;
+        left: 18px;
+        padding: 14px 16px;
         background: rgba(0, 0, 0, 0.65);
         border-radius: 14px;
         backdrop-filter: blur(6px);
         border: 1px solid rgba(255, 255, 255, 0.18);
-        width: min(320px, calc(100% - 40px));
+        width: min(270px, calc(100% - 36px));
       }
 
       h1 {
@@ -57,8 +57,8 @@
 
       .inputs {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.65rem;
         margin-bottom: 0.35rem;
       }
 
@@ -71,13 +71,13 @@
 
       input[type="text"] {
         width: 100%;
-        padding: 0.7rem 0.85rem;
-        border-radius: 10px;
+        padding: 0.55rem 0.75rem;
+        border-radius: 9px;
         border: 1px solid rgba(255, 255, 255, 0.15);
         background: rgba(255, 255, 255, 0.04);
         color: #fff;
         outline: none;
-        font-size: 0.98rem;
+        font-size: 0.92rem;
         transition: border 120ms ease, box-shadow 120ms ease;
       }
 
@@ -249,11 +249,12 @@
 
       const toRadians = THREE.MathUtils.degToRad;
       const latLonToVector3 = (lat, lon, radius = earthRadius) => {
-        const phi = toRadians(90 - lat);
-        const theta = toRadians(lon + 180);
-        const vector = new THREE.Vector3();
-        vector.setFromSpherical(new THREE.Spherical(radius, phi, theta));
-        return vector;
+        const phi = toRadians(lat);
+        const theta = toRadians(lon - 180);
+        const x = -(radius * Math.cos(phi) * Math.cos(theta));
+        const y = radius * Math.sin(phi);
+        const z = radius * Math.cos(phi) * Math.sin(theta);
+        return new THREE.Vector3(x, y, z);
       };
 
       const addGlowMarker = (position, color) => {
