@@ -3,14 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Smooth Flight Path Globe</title>
+    <title>Flight Path Globe</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" />
     <style>
       :root {
         color-scheme: light dark;
-        --panel: rgba(7, 12, 22, 0.78);
-        --text: #eaf6ff;
-        --muted: #a9b8cc;
-        --accent: #76f7ff;
       }
 
       * {
@@ -19,87 +16,86 @@
 
       body {
         margin: 0;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at 30% 30%, #101727, #05070d 60%);
-        color: var(--text);
         overflow: hidden;
+        background-color: #0c0c1a;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #fff;
       }
 
-      #app {
+      canvas {
+        display: block;
+      }
+
+      #scene {
         position: fixed;
         inset: 0;
       }
 
-      #scene {
-        width: 100%;
-        height: 100%;
-      }
-
-      #panel {
+      #info-panel {
         position: absolute;
-        top: 1.2rem;
-        left: 1.2rem;
-        width: min(420px, calc(100% - 2.4rem));
-        padding: 1.1rem 1.25rem 1rem;
-        background: var(--panel);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 16px;
-        backdrop-filter: blur(14px);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-        z-index: 2;
+        top: 20px;
+        left: 20px;
+        padding: 16px 18px;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 14px;
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        width: min(460px, calc(100% - 40px));
       }
 
       h1 {
-        margin: 0 0 0.35rem;
-        font-size: clamp(1.15rem, 3vw, 1.5rem);
+        margin: 0 0 10px 0;
+        font-size: clamp(1.1rem, 3vw, 1.4rem);
       }
 
       p {
-        margin: 0 0 1rem;
-        color: var(--muted);
+        margin: 0 0 12px 0;
         font-size: 0.95rem;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.78);
       }
 
       .inputs {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 0.75rem;
+        margin-bottom: 0.35rem;
       }
 
       label {
         display: block;
-        margin-bottom: 0.3rem;
-        color: var(--muted);
-        font-size: 0.86rem;
+        margin-bottom: 0.35rem;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.88rem;
       }
 
       input[type="text"] {
         width: 100%;
         padding: 0.7rem 0.85rem;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(12, 17, 26, 0.8);
-        color: var(--text);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.04);
+        color: #fff;
         outline: none;
         font-size: 0.98rem;
         transition: border 120ms ease, box-shadow 120ms ease;
       }
 
       input[type="text"]:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(118, 247, 255, 0.18);
+        border-color: #7ae1ff;
+        box-shadow: 0 0 0 3px rgba(122, 225, 255, 0.2);
       }
 
       button {
         margin-top: 0.4rem;
         padding: 0.85rem 1.1rem;
         border: none;
-        border-radius: 12px;
+        border-radius: 10px;
         background: linear-gradient(120deg, #76f7ff, #7affc7);
-        color: #002431;
+        color: #001c28;
         font-weight: 700;
         cursor: pointer;
-        box-shadow: 0 15px 40px rgba(118, 247, 255, 0.25);
+        box-shadow: 0 12px 30px rgba(118, 247, 255, 0.25);
         transition: transform 120ms ease, box-shadow 140ms ease;
       }
 
@@ -110,7 +106,7 @@
       #error {
         min-height: 1.2rem;
         color: #ffc2c2;
-        margin-top: 0.2rem;
+        margin-top: 0.35rem;
         font-size: 0.95rem;
       }
 
@@ -118,8 +114,9 @@
         display: flex;
         gap: 0.6rem;
         align-items: center;
-        color: var(--muted);
+        color: rgba(255, 255, 255, 0.7);
         font-size: 0.9rem;
+        margin-top: 0.45rem;
       }
 
       .dot {
@@ -140,41 +137,38 @@
       }
 
       @media (max-width: 640px) {
-        #panel {
-          top: 0.75rem;
-          left: 0.75rem;
-          width: calc(100% - 1.5rem);
-          padding: 1rem;
+        #info-panel {
+          top: 12px;
+          left: 12px;
+          width: calc(100% - 24px);
         }
       }
     </style>
   </head>
   <body>
-    <div id="app">
-      <div id="scene"></div>
-      <div id="panel">
-        <h1>Flight Path Globe</h1>
-        <p>Select two airports to draw a smooth great-circle path on a clean, high-resolution Earth.</p>
-        <div class="inputs">
-          <div>
-            <label for="from">Departure airport</label>
-            <input id="from" list="airportOptions" type="text" placeholder="e.g. LAX, Los Angeles" />
-          </div>
-          <div>
-            <label for="to">Arrival airport</label>
-            <input id="to" list="airportOptions" type="text" placeholder="e.g. JFK, New York" />
-          </div>
+    <div id="scene"></div>
+    <div id="info-panel">
+      <h1>Flight Path Globe</h1>
+      <p>Select two airports to draw a smooth great-circle path on the high-fidelity globe.</p>
+      <div class="inputs">
+        <div>
+          <label for="from">Departure airport</label>
+          <input id="from" list="airportOptions" type="text" placeholder="e.g. LAX, Los Angeles" />
         </div>
-        <datalist id="airportOptions"></datalist>
-        <button id="plot">Plot route</button>
-        <div id="error"></div>
-        <div id="legend"><span class="dot origin"></span> Departure <span class="dot destination"></span> Arrival</div>
+        <div>
+          <label for="to">Arrival airport</label>
+          <input id="to" list="airportOptions" type="text" placeholder="e.g. JFK, New York" />
+        </div>
       </div>
+      <datalist id="airportOptions"></datalist>
+      <button id="plot">Plot route</button>
+      <div id="error"></div>
+      <div id="legend"><span class="dot origin"></span> Departure <span class="dot destination"></span> Arrival</div>
     </div>
 
     <script type="module">
-      import * as THREE from 'https://unpkg.com/three@0.164.1/build/three.module.js';
-      import { OrbitControls } from 'https://unpkg.com/three@0.164.1/examples/jsm/controls/OrbitControls.js';
+      import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+      import { OrbitControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls.js';
 
       const airports = [
         { city: 'Los Angeles', name: 'Los Angeles Intl', code: 'LAX', lat: 33.9416, lon: -118.4085 },
@@ -194,65 +188,64 @@
       const sceneEl = document.getElementById('scene');
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(window.devicePixelRatio);
       sceneEl.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
-      scene.background = null;
-
-      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 0, 6);
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 3;
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.minDistance = 1.5;
+      controls.maxDistance = 10;
       controls.enablePan = false;
-      controls.minDistance = 3.5;
-      controls.maxDistance = 8;
 
-      const ambient = new THREE.AmbientLight(0xb7c9ff, 0.7);
-      const sun = new THREE.DirectionalLight(0xffffff, 1.05);
-      sun.position.set(-5, 2.5, 2.5);
-      scene.add(ambient, sun);
-
-      const earthRadius = 2.2;
-      const globeGroup = new THREE.Group();
-      scene.add(globeGroup);
-
-      const loader = new THREE.TextureLoader();
-      loader.setCrossOrigin('anonymous');
-      loader.load(
-        'https://raw.githubusercontent.com/ajayns/earth-textures/main/8k_earth_daymap.jpg',
-        (texture) => {
-          texture.colorSpace = THREE.SRGBColorSpace;
-          const geometry = new THREE.SphereGeometry(earthRadius, 96, 96);
-          const material = new THREE.MeshPhongMaterial({ map: texture });
-          const globe = new THREE.Mesh(geometry, material);
-          globeGroup.add(globe);
+      const earthRadius = 1;
+      const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
+      const textureLoader = new THREE.TextureLoader();
+      const earthTexture = textureLoader.load(
+        'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+        () => {
+          startAnimation();
         },
         undefined,
-        () => {
-          const placeholder = new THREE.Mesh(
-            new THREE.SphereGeometry(earthRadius, 64, 64),
-            new THREE.MeshStandardMaterial({ color: 0x1b2f4a })
-          );
-          globeGroup.add(placeholder);
+        (error) => {
+          console.error('An error occurred while loading the texture:', error);
+          const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.8 });
+          earth.material = fallbackMaterial;
+          startAnimation();
         }
       );
+      const earthMaterial = new THREE.MeshStandardMaterial({ map: earthTexture, roughness: 0.85, metalness: 0.1 });
+      const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+      scene.add(earth);
 
-      const atmosphere = new THREE.Mesh(
-        new THREE.SphereGeometry(earthRadius * 1.01, 64, 64),
-        new THREE.MeshBasicMaterial({
-          color: 0x9fdcff,
-          transparent: true,
-          opacity: 0.18,
-          side: THREE.DoubleSide,
-        })
-      );
-      globeGroup.add(atmosphere);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+      scene.add(ambientLight);
+      const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
+      scene.add(sunLight);
+
+      const starVertices = [];
+      for (let i = 0; i < 10000; i++) {
+        const x = (Math.random() - 0.5) * 2000;
+        const y = (Math.random() - 0.5) * 2000;
+        const z = (Math.random() - 0.5) * 2000;
+        const dist = x * x + y * y + z * z;
+        if (dist > 10000 && dist < 800000) {
+          starVertices.push(x, y, z);
+        }
+      }
+      const starGeometry = new THREE.BufferGeometry();
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, transparent: true, opacity: 0.8 });
+      const stars = new THREE.Points(starGeometry, starMaterial);
+      scene.add(stars);
 
       const markers = new THREE.Group();
       const routes = new THREE.Group();
-      globeGroup.add(markers, routes);
+      scene.add(markers, routes);
 
       const toRadians = THREE.MathUtils.degToRad;
       const latLonToVector3 = (lat, lon, radius = earthRadius) => {
@@ -264,20 +257,12 @@
       };
 
       const addGlowMarker = (position, color) => {
-        const marker = new THREE.Mesh(
-          new THREE.SphereGeometry(0.06, 16, 16),
-          new THREE.MeshBasicMaterial({ color })
-        );
+        const marker = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), new THREE.MeshBasicMaterial({ color }));
         marker.position.copy(position);
 
-        const spriteMaterial = new THREE.SpriteMaterial({
-          color,
-          transparent: true,
-          opacity: 0.5,
-          depthWrite: false,
-        });
+        const spriteMaterial = new THREE.SpriteMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false });
         const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.6, 0.6, 0.6);
+        sprite.scale.set(0.35, 0.35, 0.35);
         sprite.position.copy(position);
 
         const group = new THREE.Group();
@@ -316,14 +301,10 @@
       const buildCurve = (start, end) => {
         const startVec = latLonToVector3(start.lat, start.lon);
         const endVec = latLonToVector3(end.lat, end.lon);
-        const mid = startVec.clone().add(endVec).normalize().multiplyScalar(earthRadius * 1.4);
+        const mid = startVec.clone().add(endVec).normalize().multiplyScalar(earthRadius * 1.35);
         const curve = new THREE.CatmullRomCurve3([startVec, mid, endVec]);
-        const tube = new THREE.TubeGeometry(curve, 180, 0.025, 12, false);
-        const gradient = new THREE.MeshBasicMaterial({
-          color: 0x7ae1ff,
-          transparent: true,
-          opacity: 0.92,
-        });
+        const tube = new THREE.TubeGeometry(curve, 180, 0.01, 12, false);
+        const gradient = new THREE.MeshBasicMaterial({ color: 0x7ae1ff, transparent: true, opacity: 0.92 });
         const mesh = new THREE.Mesh(tube, gradient);
         return { mesh, startVec, endVec };
       };
@@ -364,27 +345,38 @@
       };
       window.addEventListener('resize', onResize);
 
-      const stars = new THREE.Points(
-        new THREE.BufferGeometry().setFromPoints(
-          Array.from({ length: 1200 }, () =>
-            new THREE.Vector3(
-              (Math.random() - 0.5) * 30,
-              (Math.random() - 0.5) * 30,
-              (Math.random() - 0.5) * 30
-            ).normalize().multiplyScalar(15 + Math.random() * 4)
-          )
-        ),
-        new THREE.PointsMaterial({ color: 0xffffff, size: 0.02, transparent: true, opacity: 0.8 })
-      );
-      scene.add(stars);
+      function updateSunPosition() {
+        const now = new Date();
+        const timeFraction = (now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) / 86400;
+        const start = new Date(now.getUTCFullYear(), 0, 0);
+        const diff = now - start;
+        const oneDay = 1000 * 60 * 60 * 24;
+        const dayOfYear = Math.floor(diff / oneDay);
+        const declination = -23.45 * Math.cos((2 * Math.PI) / 365 * (dayOfYear + 10)) * (Math.PI / 180);
+        const noonLongitude = (0.5 - timeFraction) * 2 * Math.PI;
+        const sunX = Math.cos(noonLongitude) * Math.cos(declination);
+        const sunY = Math.sin(declination);
+        const sunZ = Math.sin(noonLongitude) * Math.cos(declination);
+        sunLight.position.set(sunX, sunY, sunZ).normalize();
+      }
 
-      const animate = () => {
+      let animationStarted = false;
+      function startAnimation() {
+        if (animationStarted) return;
+        animationStarted = true;
+        animate();
+      }
+
+      function animate() {
         requestAnimationFrame(animate);
-        globeGroup.rotation.y += 0.0006;
+        updateSunPosition();
+        stars.rotation.y += 0.00005;
         controls.update();
         renderer.render(scene, camera);
-      };
-      animate();
+      }
+
+      updateSunPosition();
+      startAnimation();
     </script>
   </body>
 </html>
