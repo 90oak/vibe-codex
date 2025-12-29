@@ -38,5 +38,4 @@ if command -v jq >/dev/null 2>&1 && [[ -f "$CONF" ]]; then
 fi
 
 # Run the hygiene script (non-overlapping)
-exec flock -n /run/deluge-hygiene.lock \
-  bash -c '"$PY" "$SCRIPT" "$@"' _ "$@" >> "$LOG" 2>&1
+exec flock -n /run/deluge-hygiene.lock "$PY" "$SCRIPT" "$@" >> "$LOG" 2>&1
