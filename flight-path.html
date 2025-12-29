@@ -100,6 +100,18 @@
         transition: transform 120ms ease, box-shadow 140ms ease;
       }
 
+      .ghost-button {
+        margin-top: 0;
+        margin-bottom: 0.35rem;
+        background: rgba(255, 255, 255, 0.08);
+        color: #e8f7ff;
+        box-shadow: none;
+      }
+
+      .ghost-button:active {
+        transform: none;
+      }
+
       button:active {
         transform: translateY(1px);
       }
@@ -175,18 +187,10 @@
     <button id="panel-toggle" hidden aria-label="Expand flight selector">Flight selector</button>
     <div id="info-panel">
       <h1>Flight Path Globe</h1>
-      <p>Select two airports to draw a smooth great-circle path on the high-fidelity globe.</p>
-      <div class="inputs">
-        <div>
-          <label for="from">Departure airport</label>
-          <input id="from" list="airportOptions" type="text" placeholder="e.g. LAX, Los Angeles" />
-        </div>
-        <div>
-          <label for="to">Arrival airport</label>
-          <input id="to" list="airportOptions" type="text" placeholder="e.g. JFK, New York" />
-        </div>
-      </div>
+      <p>Select two or more airports to draw smooth great-circle paths on the high-fidelity globe.</p>
+      <div class="inputs" id="city-list"></div>
       <datalist id="airportOptions"></datalist>
+      <button id="add-city" class="ghost-button" type="button">+ Add another city</button>
       <button id="plot">Plot route</button>
       <div id="error"></div>
       <div id="legend"><span class="dot origin"></span> Departure <span class="dot destination"></span> Arrival</div>
@@ -335,19 +339,17 @@
         undefined,
         (error) => {
           console.error('An error occurred while loading the texture:', error);
-          const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.8 });
+          const fallbackMaterial = new THREE.MeshBasicMaterial({ color: 0x0077ff });
           earth.material = fallbackMaterial;
           startAnimation();
         }
       );
-      const earthMaterial = new THREE.MeshStandardMaterial({ map: earthTexture, roughness: 0.85, metalness: 0.1 });
+      const earthMaterial = new THREE.MeshBasicMaterial({ map: earthTexture });
       const earth = new THREE.Mesh(earthGeometry, earthMaterial);
       scene.add(earth);
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
       scene.add(ambientLight);
-      const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
-      scene.add(sunLight);
 
       const starVertices = [];
       for (let i = 0; i < 10000; i++) {
@@ -396,16 +398,62 @@
       });
 
       const errorEl = document.getElementById('error');
-      const fromInput = document.getElementById('from');
-      const toInput = document.getElementById('to');
       const plotBtn = document.getElementById('plot');
+      const addCityBtn = document.getElementById('add-city');
+      const cityList = document.getElementById('city-list');
       const infoPanel = document.getElementById('info-panel');
       const panelToggle = document.getElementById('panel-toggle');
+
+      const cityInputs = [];
+      const maxCities = 6;
+
+      const refreshLabels = () => {
+        cityInputs.forEach((input, index) => {
+          const label = input.parentElement.querySelector('label');
+          if (index === 0) {
+            label.textContent = 'Departure airport';
+            input.placeholder = 'e.g. LAX, Los Angeles';
+          } else if (index === 1) {
+            label.textContent = 'Arrival airport';
+            input.placeholder = 'e.g. JFK, New York';
+          } else {
+            label.textContent = `City ${index + 1}`;
+            input.placeholder = 'Add another stop';
+          }
+        });
+      };
+
+      const updateAddButton = () => {
+        const atLimit = cityInputs.length >= maxCities;
+        addCityBtn.disabled = atLimit;
+        addCityBtn.textContent = atLimit ? 'Max cities added' : '+ Add another city';
+      };
+
+      const createCityField = () => {
+        const wrapper = document.createElement('div');
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.setAttribute('list', 'airportOptions');
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') plotRoute();
+        });
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        cityList.appendChild(wrapper);
+        cityInputs.push(input);
+        refreshLabels();
+        updateAddButton();
+        return input;
+      };
+
+      createCityField();
+      createCityField();
 
       const expandPanel = () => {
         infoPanel.classList.remove('collapsed');
         panelToggle.hidden = true;
-        fromInput.focus();
+        cityInputs[0]?.focus();
       };
 
       const collapsePanel = (label) => {
@@ -415,6 +463,11 @@
       };
 
       panelToggle.addEventListener('click', expandPanel);
+      addCityBtn.addEventListener('click', () => {
+        if (cityInputs.length < maxCities) {
+          createCityField().focus();
+        }
+      });
 
       const normalizeInput = (value) => value.trim().toLowerCase();
       const findAirport = (value) => {
@@ -471,33 +524,48 @@
       };
 
       const plotRoute = () => {
-        const fromAirport = findAirport(fromInput.value);
-        const toAirport = findAirport(toInput.value);
         clearRoute();
 
-        if (!fromAirport || !toAirport) {
-          errorEl.textContent = 'Please pick two airports from the list.';
-          return;
-        }
-        if (fromAirport.code === toAirport.code) {
-          errorEl.textContent = 'Choose two different airports to draw a path.';
+        if (cityInputs.some((input) => !input.value.trim())) {
+          errorEl.textContent = 'Please fill in each city field before plotting.';
           return;
         }
 
-        const { mesh, startVec, endVec } = buildCurve(fromAirport, toAirport);
-        routes.add(mesh);
-        addGlowMarker(startVec, 0x7ae1ff);
-        addGlowMarker(endVec, 0xffd166);
-        errorEl.textContent = `${fromAirport.code} ➜ ${toAirport.code}`;
-        collapsePanel(`${fromAirport.code} ➜ ${toAirport.code}`);
+        const selectedAirports = cityInputs.map((input) => findAirport(input.value));
+        if (selectedAirports.some((airport) => !airport)) {
+          errorEl.textContent = 'Pick airports from the list for every city.';
+          return;
+        }
+
+        if (selectedAirports.length < 2) {
+          errorEl.textContent = 'Add at least two cities to draw a path.';
+          return;
+        }
+
+        for (let i = 0; i < selectedAirports.length - 1; i++) {
+          if (selectedAirports[i].code === selectedAirports[i + 1].code) {
+            errorEl.textContent = 'Each leg needs different departure and arrival airports.';
+            return;
+          }
+        }
+
+        selectedAirports.forEach((airport, index) => {
+          if (index === selectedAirports.length - 1) return;
+          const nextAirport = selectedAirports[index + 1];
+          const { mesh, startVec, endVec } = buildCurve(airport, nextAirport);
+          routes.add(mesh);
+          if (index === 0) {
+            addGlowMarker(startVec, 0x7ae1ff);
+          }
+          addGlowMarker(endVec, 0xffd166);
+        });
+
+        const pathLabel = selectedAirports.map(({ code }) => code).join(' ➜ ');
+        errorEl.textContent = pathLabel;
+        collapsePanel(pathLabel);
       };
 
       plotBtn.addEventListener('click', plotRoute);
-      [fromInput, toInput].forEach((input) => {
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') plotRoute();
-        });
-      });
 
       const onResize = () => {
         const { innerWidth, innerHeight } = window;
@@ -506,21 +574,6 @@
         camera.updateProjectionMatrix();
       };
       window.addEventListener('resize', onResize);
-
-      function updateSunPosition() {
-        const now = new Date();
-        const timeFraction = (now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) / 86400;
-        const start = new Date(now.getUTCFullYear(), 0, 0);
-        const diff = now - start;
-        const oneDay = 1000 * 60 * 60 * 24;
-        const dayOfYear = Math.floor(diff / oneDay);
-        const declination = -23.45 * Math.cos((2 * Math.PI) / 365 * (dayOfYear + 10)) * (Math.PI / 180);
-        const noonLongitude = (0.5 - timeFraction) * 2 * Math.PI;
-        const sunX = Math.cos(noonLongitude) * Math.cos(declination);
-        const sunY = Math.sin(declination);
-        const sunZ = Math.sin(noonLongitude) * Math.cos(declination);
-        sunLight.position.set(sunX, sunY, sunZ).normalize();
-      }
 
       let animationStarted = false;
       function startAnimation() {
@@ -531,13 +584,11 @@
 
       function animate() {
         requestAnimationFrame(animate);
-        updateSunPosition();
         stars.rotation.y += 0.00005;
         controls.update();
         renderer.render(scene, camera);
       }
 
-      updateSunPosition();
       startAnimation();
     </script>
   </body>
