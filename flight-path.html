@@ -123,6 +123,13 @@
         font-size: 0.95rem;
       }
 
+      #share-message {
+        min-height: 1.2rem;
+        color: #b2f5ea;
+        margin-top: 0.25rem;
+        font-size: 0.95rem;
+      }
+
       #legend {
         display: flex;
         gap: 0.6rem;
@@ -191,8 +198,10 @@
       <div class="inputs" id="city-list"></div>
       <datalist id="airportOptions"></datalist>
       <button id="add-city" class="ghost-button" type="button">+ Add another city</button>
+      <button id="share" class="ghost-button" type="button">Copy shareable link</button>
       <button id="plot">Plot route</button>
       <div id="error"></div>
+      <div id="share-message"></div>
       <div id="legend"><span class="dot origin"></span> Departure <span class="dot destination"></span> Arrival</div>
     </div>
 
@@ -400,12 +409,15 @@
       const errorEl = document.getElementById('error');
       const plotBtn = document.getElementById('plot');
       const addCityBtn = document.getElementById('add-city');
+      const shareBtn = document.getElementById('share');
       const cityList = document.getElementById('city-list');
       const infoPanel = document.getElementById('info-panel');
       const panelToggle = document.getElementById('panel-toggle');
+      const shareMessage = document.getElementById('share-message');
 
       const cityInputs = [];
-      const maxCities = 6;
+      const maxCities = 8;
+      const rainbowColors = [0xff4d4f, 0xffa940, 0xffd166, 0x5ec16e, 0x4098ff, 0x6750ff, 0xc050ff];
 
       const refreshLabels = () => {
         cityInputs.forEach((input, index) => {
@@ -445,6 +457,19 @@
         refreshLabels();
         updateAddButton();
         return input;
+      };
+
+      const setCityInputCount = (count) => {
+        const target = Math.min(Math.max(count, 2), maxCities);
+        while (cityInputs.length < target) {
+          createCityField();
+        }
+        while (cityInputs.length > target) {
+          const input = cityInputs.pop();
+          cityList.removeChild(input.parentElement);
+        }
+        refreshLabels();
+        updateAddButton();
       };
 
       createCityField();
@@ -491,6 +516,33 @@
         while (markers.children.length) markers.remove(markers.children[0]);
       };
 
+      const getSelectedAirports = () => {
+        if (cityInputs.some((input) => !input.value.trim())) {
+          errorEl.textContent = 'Please fill in each city field before plotting.';
+          return null;
+        }
+
+        const selectedAirports = cityInputs.map((input) => findAirport(input.value));
+        if (selectedAirports.some((airport) => !airport)) {
+          errorEl.textContent = 'Pick airports from the list for every city.';
+          return null;
+        }
+
+        if (selectedAirports.length < 2) {
+          errorEl.textContent = 'Add at least two cities to draw a path.';
+          return null;
+        }
+
+        for (let i = 0; i < selectedAirports.length - 1; i++) {
+          if (selectedAirports[i].code === selectedAirports[i + 1].code) {
+            errorEl.textContent = 'Each leg needs different departure and arrival airports.';
+            return null;
+          }
+        }
+
+        return selectedAirports;
+      };
+
       const buildCurve = (start, end) => {
         const startVec = latLonToVector3(start.lat, start.lon).normalize();
         const endVec = latLonToVector3(end.lat, end.lon).normalize();
@@ -526,33 +578,14 @@
       const plotRoute = () => {
         clearRoute();
 
-        if (cityInputs.some((input) => !input.value.trim())) {
-          errorEl.textContent = 'Please fill in each city field before plotting.';
-          return;
-        }
-
-        const selectedAirports = cityInputs.map((input) => findAirport(input.value));
-        if (selectedAirports.some((airport) => !airport)) {
-          errorEl.textContent = 'Pick airports from the list for every city.';
-          return;
-        }
-
-        if (selectedAirports.length < 2) {
-          errorEl.textContent = 'Add at least two cities to draw a path.';
-          return;
-        }
-
-        for (let i = 0; i < selectedAirports.length - 1; i++) {
-          if (selectedAirports[i].code === selectedAirports[i + 1].code) {
-            errorEl.textContent = 'Each leg needs different departure and arrival airports.';
-            return;
-          }
-        }
+        const selectedAirports = getSelectedAirports();
+        if (!selectedAirports) return;
 
         selectedAirports.forEach((airport, index) => {
           if (index === selectedAirports.length - 1) return;
           const nextAirport = selectedAirports[index + 1];
           const { mesh, startVec, endVec } = buildCurve(airport, nextAirport);
+          mesh.material.color = new THREE.Color(rainbowColors[index % rainbowColors.length]);
           routes.add(mesh);
           if (index === 0) {
             addGlowMarker(startVec, 0x7ae1ff);
@@ -566,6 +599,51 @@
       };
 
       plotBtn.addEventListener('click', plotRoute);
+
+      const buildShareLink = () => {
+        const selectedAirports = getSelectedAirports();
+        if (!selectedAirports) {
+          shareMessage.textContent = '';
+          return;
+        }
+
+        const url = new URL(window.location.href);
+        const routeParam = selectedAirports.map(({ code }) => code).join('-');
+        url.searchParams.set('route', routeParam);
+
+        navigator.clipboard
+          .writeText(url.toString())
+          .then(() => {
+            shareMessage.textContent = 'Shareable link copied to your clipboard!';
+          })
+          .catch(() => {
+            shareMessage.textContent = 'Unable to copy link. Please copy it manually: ' + url.toString();
+          });
+      };
+
+      shareBtn.addEventListener('click', buildShareLink);
+
+      const loadRouteFromQuery = () => {
+        const params = new URLSearchParams(window.location.search);
+        const routeParam = params.get('route');
+        if (!routeParam) return;
+
+        const codes = routeParam.split('-').map((code) => code.trim()).filter(Boolean);
+        if (codes.length < 2) return;
+
+        setCityInputCount(Math.min(codes.length, maxCities));
+
+        codes.slice(0, maxCities).forEach((code, index) => {
+          const airport = airports.find((a) => normalizeInput(a.code) === normalizeInput(code));
+          if (airport) {
+            cityInputs[index].value = `${airport.code} — ${airport.city}`;
+          } else {
+            cityInputs[index].value = code;
+          }
+        });
+
+        plotRoute();
+      };
 
       const onResize = () => {
         const { innerWidth, innerHeight } = window;
@@ -590,6 +668,7 @@
       }
 
       startAnimation();
+      loadRouteFromQuery();
     </script>
   </body>
 </html>
