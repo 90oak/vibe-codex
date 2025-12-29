@@ -159,8 +159,15 @@
     <p class="hint"><span class="legend-dot"></span> One city per time zone is marked with its airport code.</p>
   </div>
 
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.154.0/build/three.module.js"
+      }
+    }
+  </script>
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
+    import * as THREE from 'three';
     import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js';
     import ThreeGlobe from 'https://unpkg.com/three-globe@2.30.0/dist/three-globe.esm.min.js';
 
