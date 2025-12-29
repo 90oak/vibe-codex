@@ -39,10 +39,10 @@
 
     #ui {
       position: fixed;
-      bottom: 1.25rem;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(960px, calc(100% - 2rem));
+      top: 1.25rem;
+      left: 1.25rem;
+      transform: none;
+      width: min(440px, calc(100% - 2.5rem));
       background: var(--panel-bg);
       backdrop-filter: blur(18px);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -137,7 +137,9 @@
 
     @media (max-width: 640px) {
       #ui {
-        bottom: 0.75rem;
+        top: 0.75rem;
+        left: 0.75rem;
+        width: calc(100% - 1.5rem);
         padding: 1rem 1rem 0.85rem;
       }
     }
@@ -284,7 +286,7 @@
     };
 
     mapImage.crossOrigin = 'anonymous';
-    mapImage.src = 'https://raw.githubusercontent.com/ajdorn/earth-textures/main/earthmap1k.jpg';
+    mapImage.src = 'https://cdn.jsdelivr.net/npm/three-globe@4.6.5/example/img/earth-blue-marble.jpg';
     mapImage.onload = () => {
       mapCanvas.width = mapImage.width;
       mapCanvas.height = mapImage.height;
@@ -412,7 +414,7 @@
 
       const sun = getSunPosition();
       const sunVec = latLonToVector(sun.lat, sun.lon);
-      const cellSize = Math.max(1.5, Math.min(canvas.width, canvas.height) * 0.008);
+      const cellSize = Math.max(1, Math.min(canvas.width, canvas.height) * 0.0065);
 
       ctx.save();
       for (let lat = -90; lat <= 90; lat += 2) {
@@ -424,14 +426,17 @@
           const color = sampleMapColor(lat, lon);
           if (!color) continue;
 
-          const light = Math.max(0, vec.x * sunVec.x + vec.y * sunVec.y + vec.z * sunVec.z);
-          const twilight = Math.max(0, 1 - Math.abs(light * 1.5 - 0.2));
-          const ambient = 0.25;
-          const brightness = ambient + light * 0.85;
+          const light = vec.x * sunVec.x + vec.y * sunVec.y + vec.z * sunVec.z;
+          const diffuse = Math.max(0, light);
+          const night = Math.max(0, -light);
+          const twilight = Math.max(0, 1 - Math.abs(light * 4));
+          const ambient = 0.1;
+          const shade = 1 - night * 0.72;
+          const brightness = (ambient + diffuse * 0.95) * shade;
 
-          const r = Math.min(255, color[0] * brightness + 22 * twilight);
+          const r = Math.min(255, color[0] * brightness + 20 * twilight);
           const g = Math.min(255, color[1] * brightness + 18 * twilight);
-          const b = Math.min(255, color[2] * brightness + 40 * twilight);
+          const b = Math.min(255, color[2] * brightness + 32 * twilight);
 
           ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${color[3]})`;
           ctx.beginPath();
@@ -545,7 +550,6 @@
       const angle = Math.acos(dot);
       const steps = 120;
       const distance = greatCircleDistance(from, to);
-      const arcHeight = Math.min(0.35, 0.1 + distance / 20000);
       const points = [];
 
       for (let i = 0; i <= steps; i++) {
@@ -556,9 +560,8 @@
         const x = A * startNorm.x + B * endNorm.x;
         const y = A * startNorm.y + B * endNorm.y;
         const z = A * startNorm.z + B * endNorm.z;
-        const lift = 1 + Math.sin(Math.PI * t) * arcHeight;
         const length = Math.hypot(x, y, z) || 1;
-        points.push({ x: (x / length) * lift, y: (y / length) * lift, z: (z / length) * lift });
+        points.push({ x: x / length, y: y / length, z: z / length });
       }
       return { points, distance };
     }
