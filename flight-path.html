@@ -40,7 +40,7 @@
         border-radius: 14px;
         backdrop-filter: blur(6px);
         border: 1px solid rgba(255, 255, 255, 0.18);
-        width: min(460px, calc(100% - 40px));
+        width: min(320px, calc(100% - 40px));
       }
 
       h1 {
@@ -257,17 +257,12 @@
       };
 
       const addGlowMarker = (position, color) => {
-        const marker = new THREE.Mesh(new THREE.SphereGeometry(0.03, 16, 16), new THREE.MeshBasicMaterial({ color }));
-        marker.position.copy(position);
-
-        const spriteMaterial = new THREE.SpriteMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.35, 0.35, 0.35);
-        sprite.position.copy(position);
-
-        const group = new THREE.Group();
-        group.add(marker, sprite);
-        markers.add(group);
+        const marker = new THREE.Mesh(
+          new THREE.SphereGeometry(0.014, 20, 20),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        marker.position.copy(position.clone().setLength(earthRadius + 0.003));
+        markers.add(marker);
       };
 
       const airportOptions = document.getElementById('airportOptions');
@@ -284,13 +279,19 @@
 
       const normalizeInput = (value) => value.trim().toLowerCase();
       const findAirport = (value) => {
-        const normalized = normalizeInput(value);
-        return airports.find(
-          (airport) =>
-            normalizeInput(airport.code) === normalized ||
-            normalizeInput(airport.city) === normalized ||
-            normalizeInput(airport.name) === normalized
-        );
+        const normalizedValue = normalizeInput(value);
+        const tokens = normalizedValue
+          .split(/[—-]/)
+          .map((part) => part.trim())
+          .filter(Boolean);
+        const candidates = [normalizedValue, ...tokens].filter(Boolean);
+
+        return airports.find((airport) => {
+          const code = normalizeInput(airport.code);
+          const city = normalizeInput(airport.city);
+          const name = normalizeInput(airport.name);
+          return candidates.some((candidate) => candidate === code || candidate === city || candidate === name);
+        });
       };
 
       const clearRoute = () => {
@@ -299,14 +300,35 @@
       };
 
       const buildCurve = (start, end) => {
-        const startVec = latLonToVector3(start.lat, start.lon);
-        const endVec = latLonToVector3(end.lat, end.lon);
-        const mid = startVec.clone().add(endVec).normalize().multiplyScalar(earthRadius * 1.35);
-        const curve = new THREE.CatmullRomCurve3([startVec, mid, endVec]);
-        const tube = new THREE.TubeGeometry(curve, 180, 0.01, 12, false);
+        const startVec = latLonToVector3(start.lat, start.lon).normalize();
+        const endVec = latLonToVector3(end.lat, end.lon).normalize();
+
+        let axis = new THREE.Vector3().crossVectors(startVec, endVec);
+        if (axis.lengthSq() === 0) {
+          axis = new THREE.Vector3(0, 1, 0).cross(startVec);
+        }
+        if (axis.lengthSq() === 0) {
+          axis = new THREE.Vector3(1, 0, 0);
+        }
+        axis.normalize();
+
+        const angle = startVec.angleTo(endVec);
+        const segments = 256;
+        const points = [];
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const point = startVec
+            .clone()
+            .applyAxisAngle(axis, angle * t)
+            .setLength(earthRadius + 0.003);
+          points.push(point);
+        }
+
+        const curve = new THREE.CatmullRomCurve3(points);
+        const tube = new THREE.TubeGeometry(curve, 256, 0.0075, 10, false);
         const gradient = new THREE.MeshBasicMaterial({ color: 0x7ae1ff, transparent: true, opacity: 0.92 });
         const mesh = new THREE.Mesh(tube, gradient);
-        return { mesh, startVec, endVec };
+        return { mesh, startVec: startVec.clone().setLength(earthRadius), endVec: endVec.clone().setLength(earthRadius) };
       };
 
       const plotRoute = () => {
