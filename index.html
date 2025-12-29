@@ -265,7 +265,6 @@
     const ctx = canvas.getContext('2d');
     container.appendChild(canvas);
 
-    const mapImage = new Image();
     const mapCanvas = document.createElement('canvas');
     const mapCtx = mapCanvas.getContext('2d');
 
@@ -285,15 +284,140 @@
       lastTimestamp: 0
     };
 
-    mapImage.crossOrigin = 'anonymous';
-    mapImage.src = 'https://cdn.jsdelivr.net/npm/three-globe@4.6.5/example/img/earth-blue-marble.jpg';
-    mapImage.onload = () => {
-      mapCanvas.width = mapImage.width;
-      mapCanvas.height = mapImage.height;
-      mapCtx.drawImage(mapImage, 0, 0);
+    function lonLatToPixel(lon, lat) {
+      const x = ((lon + 180) / 360) * mapCanvas.width;
+      const y = ((90 - lat) / 180) * mapCanvas.height;
+      return { x, y };
+    }
+
+    function buildProceduralMap() {
+      mapCanvas.width = 1024;
+      mapCanvas.height = 512;
+
+      const oceanGradient = mapCtx.createLinearGradient(0, 0, 0, mapCanvas.height);
+      oceanGradient.addColorStop(0, '#082033');
+      oceanGradient.addColorStop(1, '#041421');
+      mapCtx.fillStyle = oceanGradient;
+      mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+      const landPolygons = [
+        [
+          [-168, 12],
+          [-162, 55],
+          [-150, 68],
+          [-125, 72],
+          [-100, 78],
+          [-75, 76],
+          [-58, 62],
+          [-66, 46],
+          [-90, 28],
+          [-108, 12]
+        ],
+        [
+          [-82, 12],
+          [-74, -5],
+          [-68, -12],
+          [-66, -22],
+          [-63, -35],
+          [-50, -55],
+          [-40, -55],
+          [-34, -32],
+          [-60, -8]
+        ],
+        [
+          [-25, 35],
+          [0, 70],
+          [36, 75],
+          [80, 70],
+          [120, 60],
+          [140, 55],
+          [152, 48],
+          [165, 55],
+          [170, 48],
+          [140, 36],
+          [108, 18],
+          [95, 6],
+          [60, -8],
+          [38, -8],
+          [26, 4],
+          [16, 24],
+          [6, 34]
+        ],
+        [
+          [10, 35],
+          [24, 34],
+          [32, 26],
+          [36, 12],
+          [32, -12],
+          [20, -34],
+          [10, -28],
+          [4, -16],
+          [-10, -34],
+          [-22, -22],
+          [-14, 10],
+          [-4, 28]
+        ],
+        [
+          [110, -10],
+          [118, -16],
+          [138, -10],
+          [150, -24],
+          [150, -36],
+          [136, -46],
+          [120, -40],
+          [110, -30]
+        ],
+        [
+          [-60, 60],
+          [-40, 82],
+          [-18, 76],
+          [-26, 60]
+        ],
+        [
+          [-180, -70],
+          [-120, -78],
+          [-60, -82],
+          [0, -84],
+          [60, -80],
+          [120, -82],
+          [180, -72]
+        ]
+      ];
+
+      const landFill = mapCtx.createLinearGradient(0, 0, mapCanvas.width, mapCanvas.height);
+      landFill.addColorStop(0, '#2e6b3a');
+      landFill.addColorStop(1, '#4c9c5b');
+      mapCtx.lineWidth = 1;
+      mapCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+
+      landPolygons.forEach((polygon) => {
+        mapCtx.beginPath();
+        polygon.forEach(([lon, lat], idx) => {
+          const { x, y } = lonLatToPixel(lon, lat);
+          if (idx === 0) mapCtx.moveTo(x, y);
+          else mapCtx.lineTo(x, y);
+        });
+        mapCtx.closePath();
+        mapCtx.fillStyle = landFill;
+        mapCtx.fill();
+        mapCtx.stroke();
+      });
+
+      for (let i = 0; i < 1600; i++) {
+        const x = Math.random() * mapCanvas.width;
+        const y = Math.random() * mapCanvas.height;
+        const r = Math.random() * 1.6 + 0.4;
+        mapCtx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+        mapCtx.beginPath();
+        mapCtx.arc(x, y, r, 0, Math.PI * 2);
+        mapCtx.fill();
+      }
+
       mapPixels = mapCtx.getImageData(0, 0, mapCanvas.width, mapCanvas.height).data;
       mapReady = true;
-    };
+    }
+
+    buildProceduralMap();
 
     const normalizedTimezoneCities = timezoneCities.map((city) => ({ ...city, lng: city.lon ?? city.lng }));
     state.markers = [...normalizedTimezoneCities];
@@ -363,9 +487,8 @@
       const radius = Math.min(canvas.width, canvas.height) * 0.36;
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
-      const depth = 1 / (1 - rotated.z * 0.6);
-      const x = cx + rotated.x * radius * depth;
-      const y = cy - rotated.y * radius * depth;
+      const x = cx + rotated.x * radius;
+      const y = cy - rotated.y * radius;
       return { x, y, z: rotated.z, visible: rotated.z > 0 };
     }
 
@@ -430,13 +553,13 @@
           const diffuse = Math.max(0, light);
           const night = Math.max(0, -light);
           const twilight = Math.max(0, 1 - Math.abs(light * 4));
-          const ambient = 0.1;
-          const shade = 1 - night * 0.72;
-          const brightness = (ambient + diffuse * 0.95) * shade;
+          const ambient = 0.08;
+          const shade = 1 - night * 0.9;
+          const brightness = Math.max(0, (ambient + diffuse * 0.95) * shade);
 
-          const r = Math.min(255, color[0] * brightness + 20 * twilight);
-          const g = Math.min(255, color[1] * brightness + 18 * twilight);
-          const b = Math.min(255, color[2] * brightness + 32 * twilight);
+          const r = Math.min(255, color[0] * brightness + 28 * twilight + night * 6);
+          const g = Math.min(255, color[1] * brightness + 24 * twilight + night * 12);
+          const b = Math.min(255, color[2] * brightness + 36 * twilight + night * 24);
 
           ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${color[3]})`;
           ctx.beginPath();
