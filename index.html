@@ -28,6 +28,13 @@
     #globeContainer {
       position: fixed;
       inset: 0;
+      background: radial-gradient(circle at 45% 40%, #0d1629, #03060f 55%);
+    }
+
+    #globeContainer canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
 
     #ui {
@@ -159,23 +166,7 @@
     <p class="hint"><span class="legend-dot"></span> One city per time zone is marked with its airport code.</p>
   </div>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.154.0/build/three.module.js"
-      }
-    }
-  </script>
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js';
-    import ThreeGlobe from 'https://unpkg.com/three-globe@2.30.0/dist/three-globe.esm.min.js';
-
-    const DAY_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
-    const TOPO_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
-    const NIGHT_TEXTURE = 'https://unpkg.com/three-globe/example/img/earth-night.jpg';
-    const SKY_TEXTURE = 'https://unpkg.com/three-globe/example/img/night-sky.png';
-
+  <script>
     const airportData = [
       { city: 'Auckland', name: 'Auckland Airport', code: 'AKL', country: 'New Zealand', lat: -37.0082, lon: 174.785 },
       { city: 'Sydney', name: 'Sydney Kingsford Smith', code: 'SYD', country: 'Australia', lat: -33.9399, lon: 151.1753 },
@@ -268,148 +259,303 @@
     ];
 
     const container = document.getElementById('globeContainer');
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    container.appendChild(canvas);
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.TextureLoader().load(SKY_TEXTURE);
+    const degToRad = (deg) => (deg * Math.PI) / 180;
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 0, 300);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enablePan = false;
-    controls.minDistance = 160;
-    controls.maxDistance = 520;
-
-    const globe = new ThreeGlobe()
-      .globeImageUrl(DAY_TEXTURE)
-      .bumpImageUrl(TOPO_TEXTURE)
-      .showAtmosphere(true)
-      .atmosphereColor('#8ddcff')
-      .atmosphereAltitude(0.25)
-      .labelText((d) => d.label ?? d.code ?? '')
-      .labelAltitude((d) => (d.type === 'airport' ? 0.02 : 0.015))
-      .labelSize((d) => (d.type === 'airport' ? 1.9 : 1.4))
-      .labelResolution(4)
-      .labelColor((d) => (d.type === 'airport' ? 'rgba(122, 225, 255, 0.95)' : 'rgba(255, 255, 255, 0.85)'))
-      .pointColor((d) => (d.type === 'airport' ? '#7ae1ff' : '#ffd166'))
-      .pointAltitude(0.01)
-      .pointRadius((d) => (d.type === 'airport' ? 0.9 : 0.6));
-
-    const normalizedTimezoneCities = timezoneCities.map((city) => ({ ...city, lng: city.lon ?? city.lng }));
-
-    globe.labelsData(normalizedTimezoneCities);
-    globe.pointsData(normalizedTimezoneCities);
-
-    scene.add(globe);
-
-    const ambientLight = new THREE.AmbientLight(0x666666);
-    scene.add(ambientLight);
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.15);
-    scene.add(sunLight);
-
-    const textureLoader = new THREE.TextureLoader();
-    const sunDirection = new THREE.Vector3();
-    const nightTexture = textureLoader.load(NIGHT_TEXTURE);
-
-    const globeMaterial = globe.globeMaterial();
-    globeMaterial.bumpScale = 2.5;
-    globeMaterial.specular = new THREE.Color(0x111111);
-
-    globeMaterial.onBeforeCompile = (shader) => {
-      shader.uniforms.nightTexture = { value: nightTexture };
-      shader.uniforms.sunDirection = { value: sunDirection.clone() };
-      globeMaterial.userData.shader = shader;
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `
-          vec4 dayColor = texture2D(map, vUv);
-          vec4 nightColor = texture2D(nightTexture, vUv);
-          float cosineAngle = dot(normalize(vNormal), normalize(sunDirection));
-          float mixValue = smoothstep(-0.15, 0.25, cosineAngle);
-          vec4 texelColor = mix(nightColor, dayColor, mixValue);
-          diffuseColor *= texelColor;
-        `
-      );
+    const state = {
+      yaw: 0,
+      pitch: -0.2,
+      dragging: false,
+      lastX: 0,
+      lastY: 0,
+      flightPath: null,
+      markers: [],
+      lastTimestamp: 0
     };
 
-    function dayOfYear(date) {
-      const start = Date.UTC(date.getUTCFullYear(), 0, 0);
-      const now = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-      return Math.floor((now - start) / 86400000);
-    }
-
-    function computeSunDirection(date = new Date()) {
-      const rad = Math.PI / 180;
-      const decl = 23.44 * rad * Math.sin(((360 / 365) * (dayOfYear(date) - 81)) * rad);
-      const hours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
-      const lon = (180 - hours * 15) * rad; // approximate subsolar longitude
-      const lat = decl;
-      return new THREE.Vector3(
-        Math.cos(lat) * Math.cos(lon),
-        Math.sin(lat),
-        Math.cos(lat) * Math.sin(lon)
-      );
-    }
-
-    function updateSunlight() {
-      sunDirection.copy(computeSunDirection());
-      sunLight.position.copy(sunDirection.clone().multiplyScalar(400));
-      if (globeMaterial.userData.shader) {
-        globeMaterial.userData.shader.uniforms.sunDirection.value.copy(sunDirection);
-      }
-    }
+    const normalizedTimezoneCities = timezoneCities.map((city) => ({ ...city, lng: city.lon ?? city.lng }));
+    state.markers = [...normalizedTimezoneCities];
 
     function resize() {
-      const { innerWidth: w, innerHeight: h } = window;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
 
     window.addEventListener('resize', resize);
 
+    function latLonToVector(lat, lon) {
+      const phi = degToRad(90 - lat);
+      const theta = degToRad(lon + 180);
+      return {
+        x: Math.sin(phi) * Math.cos(theta),
+        y: Math.cos(phi),
+        z: Math.sin(phi) * Math.sin(theta)
+      };
+    }
+
+    function rotateVector(vec) {
+      const cosYaw = Math.cos(state.yaw);
+      const sinYaw = Math.sin(state.yaw);
+      const cosPitch = Math.cos(state.pitch);
+      const sinPitch = Math.sin(state.pitch);
+
+      const xzRotatedX = vec.x * cosYaw - vec.z * sinYaw;
+      const xzRotatedZ = vec.x * sinYaw + vec.z * cosYaw;
+
+      const yRotatedY = vec.y * cosPitch - xzRotatedZ * sinPitch;
+      const yRotatedZ = vec.y * sinPitch + xzRotatedZ * cosPitch;
+
+      return { x: xzRotatedX, y: yRotatedY, z: yRotatedZ };
+    }
+
+    function project(vector) {
+      const rotated = rotateVector(vector);
+      const radius = Math.min(canvas.width, canvas.height) * 0.36;
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const depth = 1 / (1 - rotated.z * 0.6);
+      const x = cx + rotated.x * radius * depth;
+      const y = cy - rotated.y * radius * depth;
+      return { x, y, z: rotated.z, visible: rotated.z > 0 };
+    }
+
+    function drawGlobeBase() {
+      const radius = Math.min(canvas.width, canvas.height) * 0.36;
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+
+      ctx.save();
+      ctx.fillStyle = '#05070e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const glow = ctx.createRadialGradient(cx - radius * 0.35, cy - radius * 0.35, radius * 0.4, cx, cy, radius * 1.1);
+      glow.addColorStop(0, '#13233d');
+      glow.addColorStop(0.45, '#0c162a');
+      glow.addColorStop(1, '#050912');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+
+      const rim = ctx.createRadialGradient(cx, cy, radius * 0.6, cx, cy, radius * 1.03);
+      rim.addColorStop(0, 'rgba(0, 224, 255, 0)');
+      rim.addColorStop(0.8, 'rgba(0, 224, 255, 0.24)');
+      rim.addColorStop(1, 'rgba(0, 224, 255, 0.4)');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 224, 255, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = rim;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      ctx.restore();
+    }
+
+    function drawGraticule() {
+      const radius = Math.min(canvas.width, canvas.height) * 0.36;
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+
+      for (let lat = -60; lat <= 60; lat += 30) {
+        ctx.beginPath();
+        let started = false;
+        for (let lon = -180; lon <= 180; lon += 5) {
+          const vec = latLonToVector(lat, lon);
+          const p = project(vec);
+          if (!p.visible) {
+            started = false;
+            continue;
+          }
+          if (!started) {
+            ctx.moveTo(p.x, p.y);
+            started = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        }
+        ctx.stroke();
+      }
+
+      for (let lon = -150; lon <= 150; lon += 30) {
+        ctx.beginPath();
+        let started = false;
+        for (let lat = -90; lat <= 90; lat += 5) {
+          const vec = latLonToVector(lat, lon);
+          const p = project(vec);
+          if (!p.visible) {
+            started = false;
+            continue;
+          }
+          if (!started) {
+            ctx.moveTo(p.x, p.y);
+            started = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        }
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawMarkers() {
+      state.markers.forEach((marker) => {
+        const vec = latLonToVector(marker.lat, marker.lng ?? marker.lon);
+        const projected = project(vec);
+        if (!projected.visible) return;
+
+        const size = marker.type === 'airport' ? 6 : 4;
+        ctx.save();
+        ctx.beginPath();
+        ctx.fillStyle = marker.type === 'airport' ? '#7ae1ff' : '#ffd166';
+        ctx.shadowColor = marker.type === 'airport' ? 'rgba(122, 225, 255, 0.8)' : 'rgba(255, 209, 102, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
+        ctx.fill();
+
+        const label = marker.label ?? marker.code ?? '';
+        if (label) {
+          ctx.font = '12px Inter, system-ui, sans-serif';
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+          const textWidth = ctx.measureText(label).width;
+          ctx.fillRect(projected.x + size + 4, projected.y - 11, textWidth + 10, 18);
+          ctx.fillStyle = marker.type === 'airport' ? '#c6f6ff' : '#fff7d6';
+          ctx.fillText(label, projected.x + size + 9, projected.y + 2);
+        }
+        ctx.restore();
+      });
+    }
+
     function greatCircleDistance(a, b) {
-      const R = 6371; // km
-      const dLat = THREE.MathUtils.degToRad(b.lat - a.lat);
-      const dLon = THREE.MathUtils.degToRad(b.lon - a.lon);
-      const lat1 = THREE.MathUtils.degToRad(a.lat);
-      const lat2 = THREE.MathUtils.degToRad(b.lat);
+      const R = 6371;
+      const dLat = degToRad(b.lat - a.lat);
+      const dLon = degToRad(b.lon - a.lon);
+      const lat1 = degToRad(a.lat);
+      const lat2 = degToRad(b.lat);
       const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
       return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
     }
 
-    function setFlightPath(from, to) {
-      const fromPoint = { ...from, lng: from.lon ?? from.lng, type: 'airport', label: from.code };
-      const toPoint = { ...to, lng: to.lon ?? to.lng, type: 'airport', label: to.code };
-      const distance = greatCircleDistance(from, to);
-      const markers = [...normalizedTimezoneCities, fromPoint, toPoint];
+    function computeArcPoints(from, to) {
+      const start = latLonToVector(from.lat, from.lon ?? from.lng);
+      const end = latLonToVector(to.lat, to.lon ?? to.lng);
 
-      globe
-        .arcsData([
-          {
-            startLat: from.lat,
-            startLng: from.lon,
-            endLat: to.lat,
-            endLng: to.lon,
-            color: '#00e0ff',
-            distance
-          }
-        ])
-        .arcAltitude((d) => Math.min(0.45, 0.18 + d.distance / 15000))
-        .arcStroke(() => 0.9)
-        .arcColor(() => ['#7ae1ff', '#00ffb8'])
-        .arcDashLength(0.4)
-        .arcDashGap(1)
-        .arcDashInitialGap(() => Math.random())
-        .arcDashAnimateTime(2800)
-        .pointsData(markers)
-        .labelsData(markers);
+      const startLen = Math.hypot(start.x, start.y, start.z);
+      const endLen = Math.hypot(end.x, end.y, end.z);
+      const startNorm = { x: start.x / startLen, y: start.y / startLen, z: start.z / startLen };
+      const endNorm = { x: end.x / endLen, y: end.y / endLen, z: end.z / endLen };
+
+      const dot = Math.min(1, Math.max(-1, startNorm.x * endNorm.x + startNorm.y * endNorm.y + startNorm.z * endNorm.z));
+      const angle = Math.acos(dot);
+      const steps = 120;
+      const distance = greatCircleDistance(from, to);
+      const arcHeight = Math.min(0.35, 0.1 + distance / 20000);
+      const points = [];
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const sinTotal = Math.sin(angle) || 1;
+        const A = Math.sin((1 - t) * angle) / sinTotal;
+        const B = Math.sin(t * angle) / sinTotal;
+        const x = A * startNorm.x + B * endNorm.x;
+        const y = A * startNorm.y + B * endNorm.y;
+        const z = A * startNorm.z + B * endNorm.z;
+        const lift = 1 + Math.sin(Math.PI * t) * arcHeight;
+        const length = Math.hypot(x, y, z) || 1;
+        points.push({ x: (x / length) * lift, y: (y / length) * lift, z: (z / length) * lift });
+      }
+      return { points, distance };
     }
+
+    function focusOnVector(vec) {
+      const yaw = Math.atan2(vec.x, vec.z);
+      const zPrime = vec.x * Math.sin(yaw) + vec.z * Math.cos(yaw);
+      const pitch = Math.atan2(vec.y, zPrime);
+      state.yaw = yaw;
+      state.pitch = pitch;
+    }
+
+    function drawFlightPath() {
+      if (!state.flightPath) return;
+      const { points } = state.flightPath;
+      ctx.save();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(0, 224, 255, 0.9)';
+      ctx.shadowColor = 'rgba(0, 224, 255, 0.55)';
+      ctx.shadowBlur = 10;
+
+      let started = false;
+      ctx.beginPath();
+      points.forEach((vec) => {
+        const projected = project(vec);
+        if (!projected.visible) {
+          started = false;
+          return;
+        }
+        if (!started) {
+          ctx.moveTo(projected.x, projected.y);
+          started = true;
+        } else {
+          ctx.lineTo(projected.x, projected.y);
+        }
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawScene(timestamp = 0) {
+      const delta = state.lastTimestamp ? timestamp - state.lastTimestamp : 16;
+      state.lastTimestamp = timestamp;
+      if (!state.dragging) {
+        state.yaw += delta * 0.00025;
+      }
+
+      drawGlobeBase();
+      drawGraticule();
+      drawFlightPath();
+      drawMarkers();
+
+      requestAnimationFrame(drawScene);
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      state.dragging = true;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!state.dragging) return;
+      const dx = e.clientX - state.lastX;
+      const dy = e.clientY - state.lastY;
+      state.yaw += dx * 0.005;
+      state.pitch += dy * 0.005;
+      state.pitch = Math.max(Math.min(state.pitch, Math.PI / 2 - 0.1), -Math.PI / 2 + 0.1);
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      state.dragging = false;
+      canvas.releasePointerCapture(e.pointerId);
+    });
 
     function populateAirportList() {
       const list = document.getElementById('airportOptions');
@@ -434,6 +580,22 @@
       );
     }
 
+    function setFlightPath(from, to) {
+      const fromPoint = { ...from, lng: from.lon ?? from.lng, type: 'airport', label: from.code };
+      const toPoint = { ...to, lng: to.lon ?? to.lng, type: 'airport', label: to.code };
+      const { points, distance } = computeArcPoints(from, to);
+      state.flightPath = { points, distance };
+      state.markers = [...normalizedTimezoneCities, fromPoint, toPoint];
+      if (points.length) {
+        focusOnVector(points[Math.floor(points.length / 2)]);
+      }
+    }
+
+    function clearFlightPath() {
+      state.flightPath = null;
+      state.markers = [...normalizedTimezoneCities];
+    }
+
     function handleFlightRequest() {
       const fromInput = document.getElementById('fromInput').value;
       const toInput = document.getElementById('toInput').value;
@@ -445,10 +607,12 @@
 
       if (!from || !to) {
         errorEl.textContent = 'Please choose airports from the list or enter a known IATA code.';
+        clearFlightPath();
         return;
       }
       if (from.code === to.code) {
         errorEl.textContent = 'Pick two different airports to draw a route.';
+        clearFlightPath();
         return;
       }
 
@@ -465,17 +629,8 @@
     });
 
     populateAirportList();
-    setFlightPath(airportData.find((a) => a.code === 'LAX'), airportData.find((a) => a.code === 'JFK'));
-
-    function animate() {
-      requestAnimationFrame(animate);
-      updateSunlight();
-      controls.update();
-      renderer.render(scene, camera);
-    }
-
     resize();
-    animate();
+    requestAnimationFrame(drawScene);
   </script>
 </body>
 </html>
