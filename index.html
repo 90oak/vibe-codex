@@ -293,8 +293,10 @@
       .pointAltitude(0.01)
       .pointRadius((d) => (d.type === 'airport' ? 0.9 : 0.6));
 
-    globe.labelsData(timezoneCities);
-    globe.pointsData(timezoneCities);
+    const normalizedTimezoneCities = timezoneCities.map((city) => ({ ...city, lng: city.lon ?? city.lng }));
+
+    globe.labelsData(normalizedTimezoneCities);
+    globe.pointsData(normalizedTimezoneCities);
 
     scene.add(globe);
 
@@ -375,12 +377,10 @@
     }
 
     function setFlightPath(from, to) {
+      const fromPoint = { ...from, lng: from.lon ?? from.lng, type: 'airport', label: from.code };
+      const toPoint = { ...to, lng: to.lon ?? to.lng, type: 'airport', label: to.code };
       const distance = greatCircleDistance(from, to);
-      const markers = [
-        ...timezoneCities,
-        { ...from, label: from.code, type: 'airport' },
-        { ...to, label: to.code, type: 'airport' }
-      ];
+      const markers = [...normalizedTimezoneCities, fromPoint, toPoint];
 
       globe
         .arcsData([
