@@ -33,14 +33,15 @@
 
       #info-panel {
         position: absolute;
-        top: 18px;
-        left: 18px;
-        padding: 14px 16px;
+        top: 16px;
+        left: 16px;
+        padding: 12px 14px;
         background: rgba(0, 0, 0, 0.65);
-        border-radius: 14px;
+        border-radius: 12px;
         backdrop-filter: blur(6px);
         border: 1px solid rgba(255, 255, 255, 0.18);
-        width: min(270px, calc(100% - 36px));
+        width: min(240px, calc(100% - 32px));
+        transition: opacity 160ms ease, transform 160ms ease;
       }
 
       h1 {
@@ -71,13 +72,13 @@
 
       input[type="text"] {
         width: 100%;
-        padding: 0.55rem 0.75rem;
+        padding: 0.48rem 0.7rem;
         border-radius: 9px;
         border: 1px solid rgba(255, 255, 255, 0.15);
         background: rgba(255, 255, 255, 0.04);
         color: #fff;
         outline: none;
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         transition: border 120ms ease, box-shadow 120ms ease;
       }
 
@@ -136,6 +137,30 @@
         box-shadow: 0 0 12px rgba(255, 209, 102, 0.9);
       }
 
+      #info-panel.collapsed {
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+      }
+
+      #panel-toggle {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.7);
+        color: #e8f7ff;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      }
+
+      #panel-toggle:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
       @media (max-width: 640px) {
         #info-panel {
           top: 12px;
@@ -147,6 +172,7 @@
   </head>
   <body>
     <div id="scene"></div>
+    <button id="panel-toggle" hidden aria-label="Expand flight selector">Flight selector</button>
     <div id="info-panel">
       <h1>Flight Path Globe</h1>
       <p>Select two airports to draw a smooth great-circle path on the high-fidelity globe.</p>
@@ -171,18 +197,114 @@
       import { OrbitControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls.js';
 
       const airports = [
-        { city: 'Los Angeles', name: 'Los Angeles Intl', code: 'LAX', lat: 33.9416, lon: -118.4085 },
-        { city: 'New York', name: 'John F. Kennedy', code: 'JFK', lat: 40.6413, lon: -73.7781 },
-        { city: 'London', name: 'Heathrow', code: 'LHR', lat: 51.47, lon: -0.4543 },
-        { city: 'Paris', name: 'Charles de Gaulle', code: 'CDG', lat: 49.0097, lon: 2.5479 },
-        { city: 'Tokyo', name: 'Haneda', code: 'HND', lat: 35.5494, lon: 139.7798 },
-        { city: 'Sydney', name: 'Kingsford Smith', code: 'SYD', lat: -33.9399, lon: 151.1753 },
+        { city: 'Abu Dhabi', name: 'Abu Dhabi', code: 'AUH', lat: 24.4539, lon: 54.3773 },
+        { city: 'Addis Ababa', name: 'Bole', code: 'ADD', lat: 8.9779, lon: 38.7993 },
+        { city: 'Amsterdam', name: 'Schiphol', code: 'AMS', lat: 52.3105, lon: 4.7683 },
+        { city: 'Anchorage', name: 'Ted Stevens', code: 'ANC', lat: 61.1743, lon: -149.9985 },
+        { city: 'Athens', name: 'Eleftherios Venizelos', code: 'ATH', lat: 37.9364, lon: 23.9475 },
+        { city: 'Atlanta', name: 'Hartsfield-Jackson', code: 'ATL', lat: 33.6407, lon: -84.4277 },
+        { city: 'Auckland', name: 'Auckland', code: 'AKL', lat: -37.0082, lon: 174.785 },
+        { city: 'Austin', name: 'Austin-Bergstrom', code: 'AUS', lat: 30.1975, lon: -97.6664 },
+        { city: 'Barcelona', name: 'El Prat', code: 'BCN', lat: 41.2974, lon: 2.0833 },
+        { city: 'Baltimore', name: 'Baltimore/Washington', code: 'BWI', lat: 39.1754, lon: -76.6684 },
+        { city: 'Bangkok', name: 'Suvarnabhumi', code: 'BKK', lat: 13.690, lon: 100.7501 },
+        { city: 'Beijing', name: 'Capital', code: 'PEK', lat: 40.0799, lon: 116.6031 },
+        { city: 'Bengaluru', name: 'Kempegowda', code: 'BLR', lat: 13.1986, lon: 77.7066 },
+        { city: 'Bogotá', name: 'El Dorado', code: 'BOG', lat: 4.7016, lon: -74.1469 },
+        { city: 'Boston', name: 'Logan', code: 'BOS', lat: 42.3656, lon: -71.0096 },
+        { city: 'Brussels', name: 'Brussels', code: 'BRU', lat: 50.901, lon: 4.4844 },
+        { city: 'Buenos Aires', name: 'Ezeiza', code: 'EZE', lat: -34.8222, lon: -58.5358 },
+        { city: 'Cairo', name: 'Cairo Intl', code: 'CAI', lat: 30.1219, lon: 31.4056 },
+        { city: 'Calgary', name: 'Calgary', code: 'YYC', lat: 51.1139, lon: -114.0201 },
+        { city: 'Cape Town', name: 'Cape Town Intl', code: 'CPT', lat: -33.9696, lon: 18.5972 },
+        { city: 'Casablanca', name: 'Mohammed V', code: 'CMN', lat: 33.3675, lon: -7.58997 },
+        { city: 'Charlotte', name: 'Douglas', code: 'CLT', lat: 35.214, lon: -80.9431 },
+        { city: 'Chengdu', name: 'Shuangliu', code: 'CTU', lat: 30.5785, lon: 103.9471 },
+        { city: 'Chicago', name: "O'Hare", code: 'ORD', lat: 41.9742, lon: -87.9073 },
+        { city: 'Copenhagen', name: 'Kastrup', code: 'CPH', lat: 55.6181, lon: 12.6561 },
+        { city: 'Dallas/Fort Worth', name: 'Dallas/Fort Worth', code: 'DFW', lat: 32.8998, lon: -97.0403 },
+        { city: 'Delhi', name: 'Indira Gandhi', code: 'DEL', lat: 28.5562, lon: 77.1 },
+        { city: 'Denver', name: 'Denver Intl', code: 'DEN', lat: 39.8561, lon: -104.6737 },
+        { city: 'Detroit', name: 'Detroit Metro', code: 'DTW', lat: 42.2124, lon: -83.3534 },
+        { city: 'Doha', name: 'Hamad Intl', code: 'DOH', lat: 25.2731, lon: 51.6081 },
         { city: 'Dubai', name: 'Dubai International', code: 'DXB', lat: 25.2532, lon: 55.3657 },
-        { city: 'Singapore', name: 'Changi', code: 'SIN', lat: 1.3644, lon: 103.9915 },
-        { city: 'Toronto', name: 'Pearson', code: 'YYZ', lat: 43.6777, lon: -79.6248 },
-        { city: 'São Paulo', name: 'Guarulhos', code: 'GRU', lat: -23.4356, lon: -46.4731 },
+        { city: 'Dublin', name: 'Dublin', code: 'DUB', lat: 53.4213, lon: -6.2701 },
+        { city: 'Düsseldorf', name: 'Düsseldorf', code: 'DUS', lat: 51.2895, lon: 6.7668 },
+        { city: 'Edinburgh', name: 'Edinburgh', code: 'EDI', lat: 55.95, lon: -3.3725 },
+        { city: 'Frankfurt', name: 'Frankfurt', code: 'FRA', lat: 50.0379, lon: 8.5622 },
+        { city: 'Guangzhou', name: 'Baiyun', code: 'CAN', lat: 23.3924, lon: 113.2988 },
+        { city: 'Guarulhos', name: 'São Paulo/Guarulhos', code: 'GRU', lat: -23.4356, lon: -46.4731 },
+        { city: 'Hamburg', name: 'Hamburg', code: 'HAM', lat: 53.6304, lon: 9.9882 },
+        { city: 'Haneda (Tokyo)', name: 'Haneda', code: 'HND', lat: 35.5494, lon: 139.7798 },
+        { city: 'Hanoi', name: 'Noi Bai', code: 'HAN', lat: 21.2212, lon: 105.8072 },
+        { city: 'Helsinki', name: 'Vantaa', code: 'HEL', lat: 60.3172, lon: 24.9633 },
+        { city: 'Ho Chi Minh City', name: 'Tan Son Nhat', code: 'SGN', lat: 10.8188, lon: 106.6518 },
+        { city: 'Hoedspruit', name: 'Eastgate', code: 'HDS', lat: -24.3686, lon: 31.0487 },
+        { city: 'Hong Kong', name: 'Hong Kong Intl', code: 'HKG', lat: 22.308, lon: 113.9185 },
+        { city: 'Honolulu', name: 'Daniel K. Inouye', code: 'HNL', lat: 21.3245, lon: -157.9251 },
+        { city: 'Houston', name: 'George Bush', code: 'IAH', lat: 29.9902, lon: -95.3368 },
+        { city: 'Istanbul', name: 'Istanbul Airport', code: 'IST', lat: 41.2753, lon: 28.7519 },
+        { city: 'Jakarta', name: 'Soekarno–Hatta', code: 'CGK', lat: -6.1256, lon: 106.6559 },
+        { city: 'Jeddah', name: 'King Abdulaziz', code: 'JED', lat: 21.6702, lon: 39.1528 },
         { city: 'Johannesburg', name: 'OR Tambo', code: 'JNB', lat: -26.1337, lon: 28.242 },
-        { city: 'Delhi', name: 'Indira Gandhi', code: 'DEL', lat: 28.5562, lon: 77.1 }
+        { city: 'Kansai (Osaka)', name: 'Kansai', code: 'KIX', lat: 34.4273, lon: 135.244 },
+        { city: 'Kuala Lumpur', name: 'Kuala Lumpur Intl', code: 'KUL', lat: 2.7456, lon: 101.7072 },
+        { city: 'Las Vegas', name: 'Harry Reid', code: 'LAS', lat: 36.084, lon: -115.1537 },
+        { city: 'Lima', name: 'Jorge Chávez', code: 'LIM', lat: -12.0219, lon: -77.1143 },
+        { city: 'Lisbon', name: 'Humberto Delgado', code: 'LIS', lat: 38.7742, lon: -9.1342 },
+        { city: 'London', name: 'Gatwick', code: 'LGW', lat: 51.1537, lon: -0.1821 },
+        { city: 'London', name: 'Heathrow', code: 'LHR', lat: 51.47, lon: -0.4543 },
+        { city: 'Los Angeles', name: 'Los Angeles Intl', code: 'LAX', lat: 33.9416, lon: -118.4085 },
+        { city: 'Madrid', name: 'Barajas', code: 'MAD', lat: 40.4983, lon: -3.5676 },
+        { city: 'Manila', name: 'Ninoy Aquino', code: 'MNL', lat: 14.5086, lon: 121.0198 },
+        { city: 'Manchester', name: 'Manchester', code: 'MAN', lat: 53.3537, lon: -2.27495 },
+        { city: 'Melbourne', name: 'Tullamarine', code: 'MEL', lat: -37.6733, lon: 144.843 },
+        { city: 'Orlando', name: 'Orlando Intl', code: 'MCO', lat: 28.4312, lon: -81.3081 },
+        { city: 'Mexico City', name: 'Benito Juárez', code: 'MEX', lat: 19.4361, lon: -99.0719 },
+        { city: 'Miami', name: 'Miami Intl', code: 'MIA', lat: 25.7959, lon: -80.287 },
+        { city: 'Minneapolis', name: 'Saint Paul', code: 'MSP', lat: 44.883, lon: -93.2223 },
+        { city: 'Montréal', name: 'Trudeau', code: 'YUL', lat: 45.4706, lon: -73.7408 },
+        { city: 'Moscow', name: 'Sheremetyevo', code: 'SVO', lat: 55.9728, lon: 37.4146 },
+        { city: 'Mumbai', name: 'Chhatrapati Shivaji', code: 'BOM', lat: 19.0896, lon: 72.8656 },
+        { city: 'Munich', name: 'Munich', code: 'MUC', lat: 48.3538, lon: 11.7861 },
+        { city: 'Nagoya', name: 'Chubu Centrair', code: 'NGO', lat: 34.8584, lon: 136.8044 },
+        { city: 'New York', name: 'John F. Kennedy', code: 'JFK', lat: 40.6413, lon: -73.7781 },
+        { city: 'New York', name: 'LaGuardia', code: 'LGA', lat: 40.7769, lon: -73.874 },
+        { city: 'Newark', name: 'Newark Liberty', code: 'EWR', lat: 40.6895, lon: -74.1745 },
+        { city: 'Oslo', name: 'Gardermoen', code: 'OSL', lat: 60.1939, lon: 11.1004 },
+        { city: 'Paris', name: 'Charles de Gaulle', code: 'CDG', lat: 49.0097, lon: 2.5479 },
+        { city: 'Paris', name: 'Orly', code: 'ORY', lat: 48.7262, lon: 2.3652 },
+        { city: 'Perth', name: 'Perth', code: 'PER', lat: -31.9403, lon: 115.967 },
+        { city: 'Philadelphia', name: 'Philadelphia', code: 'PHL', lat: 39.8744, lon: -75.2424 },
+        { city: 'Phoenix', name: 'Sky Harbor', code: 'PHX', lat: 33.4352, lon: -112.009 },
+        { city: 'Prague', name: 'Václav Havel', code: 'PRG', lat: 50.1008, lon: 14.26 },
+        { city: 'Rio de Janeiro', name: 'Galeão', code: 'GIG', lat: -22.8099, lon: -43.2506 },
+        { city: 'Riyadh', name: 'King Khalid', code: 'RUH', lat: 24.9596, lon: 46.7029 },
+        { city: 'Rome', name: 'Fiumicino', code: 'FCO', lat: 41.8003, lon: 12.2389 },
+        { city: 'Salt Lake City', name: 'Salt Lake City', code: 'SLC', lat: 40.7899, lon: -111.9791 },
+        { city: 'San Diego', name: 'San Diego Intl', code: 'SAN', lat: 32.7338, lon: -117.1933 },
+        { city: 'San Francisco', name: 'San Francisco Intl', code: 'SFO', lat: 37.6213, lon: -122.379 },
+        { city: 'San Jose', name: 'Mineta San Jose', code: 'SJC', lat: 37.3639, lon: -121.9289 },
+        { city: 'Santiago', name: 'Arturo Merino Benítez', code: 'SCL', lat: -33.3928, lon: -70.7856 },
+        { city: 'São Paulo', name: 'Congonhas', code: 'CGH', lat: -23.6261, lon: -46.6566 },
+        { city: 'Seattle', name: 'Seattle-Tacoma', code: 'SEA', lat: 47.4502, lon: -122.3088 },
+        { city: 'Seoul', name: 'Incheon', code: 'ICN', lat: 37.4602, lon: 126.4407 },
+        { city: 'Shenzhen', name: 'Bao’an', code: 'SZX', lat: 22.6393, lon: 113.8108 },
+        { city: 'Shanghai', name: 'Pudong', code: 'PVG', lat: 31.1443, lon: 121.8083 },
+        { city: 'Singapore', name: 'Changi', code: 'SIN', lat: 1.3644, lon: 103.9915 },
+        { city: 'St. Petersburg', name: 'Pulkovo', code: 'LED', lat: 59.8003, lon: 30.2625 },
+        { city: 'Stockholm', name: 'Arlanda', code: 'ARN', lat: 59.6519, lon: 17.9186 },
+        { city: 'Sydney', name: 'Kingsford Smith', code: 'SYD', lat: -33.9399, lon: 151.1753 },
+        { city: 'Taipei', name: 'Taoyuan', code: 'TPE', lat: 25.0797, lon: 121.2328 },
+        { city: 'Tel Aviv', name: 'Ben Gurion', code: 'TLV', lat: 32.0005, lon: 34.8708 },
+        { city: 'Tokyo', name: 'Narita', code: 'NRT', lat: 35.7719, lon: 140.3929 },
+        { city: 'Toronto', name: 'Pearson', code: 'YYZ', lat: 43.6777, lon: -79.6248 },
+        { city: 'Vancouver', name: 'Vancouver', code: 'YVR', lat: 49.1951, lon: -123.1779 },
+        { city: 'Vienna', name: 'Vienna', code: 'VIE', lat: 48.1103, lon: 16.5697 },
+        { city: 'Warsaw', name: 'Chopin', code: 'WAW', lat: 52.1657, lon: 20.9671 },
+        { city: 'Washington D.C.', name: 'Dulles', code: 'IAD', lat: 38.9531, lon: -77.4565 },
+        { city: 'Washington D.C.', name: 'Reagan', code: 'DCA', lat: 38.8512, lon: -77.0402 },
+        { city: 'Zurich', name: 'Zurich', code: 'ZRH', lat: 47.4581, lon: 8.5555 }
       ];
 
       const sceneEl = document.getElementById('scene');
@@ -277,6 +399,22 @@
       const fromInput = document.getElementById('from');
       const toInput = document.getElementById('to');
       const plotBtn = document.getElementById('plot');
+      const infoPanel = document.getElementById('info-panel');
+      const panelToggle = document.getElementById('panel-toggle');
+
+      const expandPanel = () => {
+        infoPanel.classList.remove('collapsed');
+        panelToggle.hidden = true;
+        fromInput.focus();
+      };
+
+      const collapsePanel = (label) => {
+        infoPanel.classList.add('collapsed');
+        panelToggle.hidden = false;
+        panelToggle.textContent = label || 'Flight selector';
+      };
+
+      panelToggle.addEventListener('click', expandPanel);
 
       const normalizeInput = (value) => value.trim().toLowerCase();
       const findAirport = (value) => {
@@ -351,6 +489,7 @@
         addGlowMarker(startVec, 0x7ae1ff);
         addGlowMarker(endVec, 0xffd166);
         errorEl.textContent = `${fromAirport.code} ➜ ${toAirport.code}`;
+        collapsePanel(`${fromAirport.code} ➜ ${toAirport.code}`);
       };
 
       plotBtn.addEventListener('click', plotRoute);
