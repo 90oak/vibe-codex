@@ -427,12 +427,14 @@
             vec3 nightColor = texture2D(nightTexture, vUv).rgb;
 
             float lightAmount = dot(normalize(vNormal), normalize(sunDirection));
-            float dayMix = smoothstep(-0.2, 0.25, lightAmount);
-            float twilight = smoothstep(-0.35, 0.0, lightAmount) * (1.0 - dayMix);
+            float daylight = smoothstep(-0.08, 0.12, lightAmount);
+            float twilight = smoothstep(-0.25, 0.0, lightAmount) * (1.0 - daylight);
 
-            vec3 nightGlow = nightColor * nightGlowBoost + vec3(0.02, 0.05, 0.08);
-            vec3 baseColor = mix(nightGlow, dayColor, dayMix);
-            baseColor += dayColor * ambientStrength + twilight * 0.08;
+            vec3 dayLit = dayColor * (0.7 + 0.3 * max(lightAmount, 0.0)) + dayColor * ambientStrength;
+            vec3 nightLit = nightColor * nightGlowBoost + vec3(0.02, 0.05, 0.08);
+
+            vec3 baseColor = mix(nightLit, dayLit, daylight);
+            baseColor += twilight * 0.08;
 
             gl_FragColor = vec4(baseColor, 1.0);
           }
