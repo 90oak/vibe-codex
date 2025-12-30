@@ -224,7 +224,7 @@
   <main>
     <header>
       <h1>Safari Impostor</h1>
-      <p class="lead">A quick party game for Kruger National Park animal lovers.</p>
+      <p class="lead">A quick party game with safari animals or airport travel words.</p>
     </header>
 
     <section id="setup" class="card visible">
@@ -243,6 +243,13 @@
           <select id="impostor-count">
             <option value="1">1</option>
             <option value="2">2</option>
+          </select>
+        </div>
+        <div>
+          <label for="category-select">Category</label>
+          <select id="category-select">
+            <option value="safari">Safari animals</option>
+            <option value="travel">Travel (airport)</option>
           </select>
         </div>
       </div>
@@ -296,28 +303,72 @@
   </main>
 
   <script>
-    const animals = [
-      "African elephant",
-      "African lion",
-      "African wild dog",
-      "Black rhinoceros",
-      "Blue wildebeest",
-      "Cape buffalo",
-      "Cheetah",
-      "Giraffe",
-      "Hippopotamus",
-      "Hyena",
-      "Impala",
-      "Kudu",
-      "Leopard",
-      "Meerkat",
-      "Nile crocodile",
-      "Secretarybird",
-      "Serval",
-      "Spotted bush snake",
-      "Warthog",
-      "Zebra"
-    ];
+    const categories = {
+      safari: {
+        label: "Safari",
+        clueNoun: "animal",
+        seerTitle: "Your safari clue",
+        words: [
+          "African elephant",
+          "African lion",
+          "African wild dog",
+          "Black rhinoceros",
+          "Blue wildebeest",
+          "Cape buffalo",
+          "Cheetah",
+          "Giraffe",
+          "Hippopotamus",
+          "Hyena",
+          "Impala",
+          "Kudu",
+          "Leopard",
+          "Meerkat",
+          "Nile crocodile",
+          "Secretarybird",
+          "Serval",
+          "Spotted bush snake",
+          "Warthog",
+          "Zebra",
+        ],
+      },
+      travel: {
+        label: "Travel",
+        clueNoun: "travel word",
+        seerTitle: "Your travel clue",
+        words: [
+          "Boarding pass",
+          "Passport",
+          "Gate",
+          "Terminal",
+          "Security",
+          "Baggage claim",
+          "Carry-on",
+          "Check-in",
+          "Customs",
+          "Departure",
+          "Arrival",
+          "Connecting flight",
+          "Layover",
+          "Boarding group",
+          "Overhead bin",
+          "Window seat",
+          "Aisle seat",
+          "Middle seat",
+          "Seatbelt",
+          "Flight attendant",
+          "Pilot",
+          "Cockpit",
+          "Runway",
+          "Tarmac",
+          "Delayed",
+          "On-time",
+          "Turbulence",
+          "Duty-free",
+          "Upgrade",
+          "Checked bag",
+        ],
+      },
+    };
 
     const sections = {
       setup: document.getElementById("setup"),
@@ -330,6 +381,7 @@
     const playerCountInput = document.getElementById("player-count");
     const impostorCountSelect = document.getElementById("impostor-count");
     const namesContainer = document.getElementById("names");
+    const categorySelect = document.getElementById("category-select");
     const startBtn = document.getElementById("start-btn");
     const assignButtons = document.getElementById("assign-buttons");
     const assignStatus = document.getElementById("assign-status");
@@ -346,7 +398,8 @@
     const setupTip = document.getElementById("setup-tip");
     const skipBtn = document.getElementById("skip-btn");
 
-    let currentAnimal = "";
+    let currentWord = "";
+    let currentCategoryId = categorySelect.value;
     let players = [];
     let assignedCount = 0;
     let impostorNames = [];
@@ -375,24 +428,33 @@
       return arr;
     }
 
-    function getQueue() {
-      const stored = localStorage.getItem("safariAnimalQueue");
+    function getQueue(categoryId) {
+      const { words } = categories[categoryId];
+      const storageKey = `impostorQueue-${categoryId}`;
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length) return parsed;
         } catch (_) {}
       }
-      const fresh = shuffle(animals);
-      localStorage.setItem("safariAnimalQueue", JSON.stringify(fresh));
+      const fresh = shuffle(words);
+      localStorage.setItem(storageKey, JSON.stringify(fresh));
       return fresh;
     }
 
-    function drawAnimal() {
-      const queue = getQueue();
-      const animal = queue.shift();
-      localStorage.setItem("safariAnimalQueue", JSON.stringify(queue.length ? queue : shuffle(animals)));
-      return animal;
+    function drawWord(categoryId) {
+      const { words } = categories[categoryId];
+      const storageKey = `impostorQueue-${categoryId}`;
+      const queue = getQueue(categoryId);
+      const word = queue.shift();
+      localStorage.setItem(storageKey, JSON.stringify(queue.length ? queue : shuffle(words)));
+      return word;
+    }
+
+    function formatClueLabel(categoryId) {
+      const noun = categories[categoryId].clueNoun;
+      return `${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
     }
 
     function updateNameFields(count, existingNames = []) {
@@ -426,13 +488,14 @@
       lastNames = rawNames;
       players = rawNames.map((name) => ({ name, role: "" }));
 
-      currentAnimal = drawAnimal();
+      currentCategoryId = categorySelect.value;
+      currentWord = drawWord(currentCategoryId);
       impostorNames = shuffle(players).slice(0, impostorCount).map((p) => p.name);
       players = players.map((p) => ({ ...p, role: impostorNames.includes(p.name) ? "impostor" : "seer" }));
       playerOrder = players.map((p) => p.name);
       assignedCount = 0;
-      roundAnimalPill.textContent = `Round animal chosen`;
-      assignInstructions.innerHTML = `Hand the phone around. Each player taps their name, sees their role, then taps <strong>Got it</strong>.`;
+      roundAnimalPill.textContent = `Round ${categories[currentCategoryId].clueNoun} chosen`;
+      assignInstructions.innerHTML = `Category: <strong>${categories[currentCategoryId].label}</strong>. Hand the phone around. Each player taps their name, sees their role, then taps <strong>Got it</strong>.`;
       renderAssignButtons();
       assignStatus.textContent = `${players.length} players awaiting their clue.`;
       currentViewer = null;
@@ -456,17 +519,18 @@
     function revealForPlayer(player) {
       currentViewer = player;
       player.revealed = true;
-      roleTitle.textContent = player.role === "impostor" ? "You are the Impostor" : "Your safari clue";
+      const category = categories[currentCategoryId];
+      roleTitle.textContent = player.role === "impostor" ? "You are the Impostor" : category.seerTitle;
       if (player.role === "impostor") {
-        roleDetail.textContent = "Blend in and guess the animal before you are found out.";
+        roleDetail.textContent = `Blend in and guess the ${category.clueNoun} before you are found out.`;
         skipBtn.style.display = "none";
       } else {
-        roleDetail.textContent = `Your animal: ${currentAnimal}`;
+        roleDetail.textContent = `Your ${category.clueNoun}: ${currentWord}`;
         const othersRevealed = players.some((p) => p.revealed && p !== player);
         const canSkip = !othersRevealed;
         skipBtn.style.display = "block";
         skipBtn.disabled = !canSkip;
-        skipBtn.title = canSkip ? "" : "Skip is only available before anyone else views the animal.";
+        skipBtn.title = canSkip ? "" : `Skip is only available before anyone else views the ${category.clueNoun}.`;
       }
       setVisible("waiting");
     }
@@ -492,16 +556,18 @@
       if (!currentViewer || currentViewer.role === "impostor") return;
       const othersRevealed = players.some((p) => p.revealed && p !== currentViewer);
       if (othersRevealed) {
-        alert("Skip is only available before anyone else views the animal.");
+        alert(`Skip is only available before anyone else views the ${categories[currentCategoryId].clueNoun}.`);
         return;
       }
-      currentAnimal = drawAnimal();
-      roleDetail.textContent = `Your animal: ${currentAnimal}`;
-      roundAnimalPill.textContent = "New animal chosen";
+      currentWord = drawWord(currentCategoryId);
+      const category = categories[currentCategoryId];
+      roleDetail.textContent = `Your ${category.clueNoun}: ${currentWord}`;
+      roundAnimalPill.textContent = `New ${category.clueNoun} chosen`;
     }
 
     function revealOutcome() {
-      revealAnimal.textContent = currentAnimal;
+      const label = formatClueLabel(currentCategoryId);
+      revealAnimal.textContent = `${label}: ${currentWord}`;
       impostorList.innerHTML = "";
       impostorNames.forEach((name) => {
         const li = document.createElement("li");
@@ -524,7 +590,7 @@
       players = [];
       assignedCount = 0;
       impostorNames = [];
-      currentAnimal = "";
+      currentWord = "";
       playerOrder = [];
       currentViewer = null;
       setVisible("setup");
