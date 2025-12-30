@@ -130,6 +130,12 @@
         font-size: 0.95rem;
       }
 
+      #current-time {
+        margin-top: 0.2rem;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 0.9rem;
+      }
+
       #legend {
         display: flex;
         gap: 0.6rem;
@@ -202,6 +208,7 @@
       <button id="plot">Plot route</button>
       <div id="error"></div>
       <div id="share-message"></div>
+      <div id="current-time" aria-live="polite"></div>
       <div id="legend"><span class="dot origin"></span> Departure <span class="dot destination"></span> Arrival</div>
     </div>
 
@@ -391,7 +398,7 @@
         const subsolarLongitude = normalizeRadians(rightAscension - siderealTime);
 
         const latDeg = THREE.MathUtils.radToDeg(declination);
-        const lonDeg = THREE.MathUtils.radToDeg(subsolarLongitude) - 180;
+        const lonDeg = ((THREE.MathUtils.radToDeg(subsolarLongitude) + 540) % 360) - 180;
 
         return latLonToVector3(latDeg, lonDeg, 1).normalize();
       };
@@ -504,6 +511,7 @@
       const infoPanel = document.getElementById('info-panel');
       const panelToggle = document.getElementById('panel-toggle');
       const shareMessage = document.getElementById('share-message');
+      const currentTimeEl = document.getElementById('current-time');
 
       const cityInputs = [];
       const maxCities = 8;
@@ -743,9 +751,23 @@
       };
       window.addEventListener('resize', onResize);
 
-      const updateSunDirection = () => {
-        sunDirection.copy(computeSunDirection(new Date()));
+      const updateSunDirection = (date = new Date()) => {
+        sunDirection.copy(computeSunDirection(date));
         earthMaterial.uniforms.sunDirection.value.copy(sunDirection);
+      };
+
+      const formatCurrentTime = (date) => {
+        return date.toLocaleString(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'medium',
+          hour12: false
+        });
+      };
+
+      const updateCurrentTime = (date = new Date()) => {
+        if (!currentTimeEl) return;
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        currentTimeEl.textContent = `Current time: ${formatCurrentTime(date)} (${timeZone})`;
       };
 
       let animationStarted = false;
@@ -757,7 +779,9 @@
 
       function animate() {
         requestAnimationFrame(animate);
-        updateSunDirection();
+        const now = new Date();
+        updateSunDirection(now);
+        updateCurrentTime(now);
         stars.rotation.y += 0.00005;
         controls.update();
         renderer.render(scene, camera);
