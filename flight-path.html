@@ -338,22 +338,74 @@
       controls.enablePan = false;
 
       const earthRadius = 1;
+      let texturesLoaded = 0;
+      const onTextureLoad = () => {
+        texturesLoaded += 1;
+        startAnimation();
+      };
+
       const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
       const textureLoader = new THREE.TextureLoader();
-      const earthTexture = textureLoader.load(
+
+      const dayTexture = textureLoader.load(
         'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
-        () => {
-          startAnimation();
-        },
+        onTextureLoad,
         undefined,
-        (error) => {
-          console.error('An error occurred while loading the texture:', error);
-          const fallbackMaterial = new THREE.MeshBasicMaterial({ color: 0x0077ff });
-          earth.material = fallbackMaterial;
-          startAnimation();
-        }
+        (error) => console.error('An error occurred while loading the day texture:', error)
       );
-      const earthMaterial = new THREE.MeshBasicMaterial({ map: earthTexture });
+
+      const nightTexture = textureLoader.load(
+        'https://threejs.org/examples/textures/planets/earth_lights_2048.png',
+        onTextureLoad,
+        undefined,
+        (error) => console.error('An error occurred while loading the night texture:', error)
+      );
+
+      const sunDirection = new THREE.Vector3(1, 0, 0);
+
+      const earthMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          dayTexture: { value: dayTexture },
+          nightTexture: { value: nightTexture },
+          sunDirection: { value: sunDirection },
+          ambientStrength: { value: 0.18 },
+          nightGlowBoost: { value: 1.25 }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          varying vec3 vNormal;
+          void main() {
+            vUv = uv;
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D dayTexture;
+          uniform sampler2D nightTexture;
+          uniform vec3 sunDirection;
+          uniform float ambientStrength;
+          uniform float nightGlowBoost;
+          varying vec2 vUv;
+          varying vec3 vNormal;
+
+          void main() {
+            vec3 dayColor = texture2D(dayTexture, vUv).rgb;
+            vec3 nightColor = texture2D(nightTexture, vUv).rgb;
+
+            float lightAmount = dot(normalize(vNormal), normalize(sunDirection));
+            float dayMix = smoothstep(-0.2, 0.25, lightAmount);
+            float twilight = smoothstep(-0.35, 0.0, lightAmount) * (1.0 - dayMix);
+
+            vec3 nightGlow = nightColor * nightGlowBoost + vec3(0.02, 0.05, 0.08);
+            vec3 baseColor = mix(nightGlow, dayColor, dayMix);
+            baseColor += dayColor * ambientStrength + twilight * 0.08;
+
+            gl_FragColor = vec4(baseColor, 1.0);
+          }
+        `
+      });
+
       const earth = new THREE.Mesh(earthGeometry, earthMaterial);
       scene.add(earth);
 
@@ -653,15 +705,26 @@
       };
       window.addEventListener('resize', onResize);
 
+      const updateSunDirection = () => {
+        const now = Date.now();
+        const rotation = ((now % 86400000) / 86400000) * Math.PI * 2;
+        const axialTilt = 0.35;
+        sunDirection
+          .set(Math.cos(rotation), Math.sin(axialTilt) * Math.sin(rotation), Math.sin(rotation))
+          .normalize();
+        earthMaterial.uniforms.sunDirection.value.copy(sunDirection);
+      };
+
       let animationStarted = false;
       function startAnimation() {
-        if (animationStarted) return;
+        if (animationStarted || texturesLoaded < 2) return;
         animationStarted = true;
         animate();
       }
 
       function animate() {
         requestAnimationFrame(animate);
+        updateSunDirection();
         stars.rotation.y += 0.00005;
         controls.update();
         renderer.render(scene, camera);
