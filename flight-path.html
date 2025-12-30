@@ -363,6 +363,39 @@
 
       const sunDirection = new THREE.Vector3(1, 0, 0);
 
+      const toJulianDay = (date) => date.getTime() / 86400000 + 2440587.5;
+      const normalizeRadians = (value) => {
+        const twoPi = Math.PI * 2;
+        return ((value % twoPi) + twoPi) % twoPi;
+      };
+
+      const computeSunDirection = (date = new Date()) => {
+        // Adapted from NOAA Solar Position Algorithm (simplified)
+        const rad = Math.PI / 180;
+        const J2000 = 2451545;
+        const daysSinceJ2000 = toJulianDay(date) - J2000;
+
+        const meanAnomaly = normalizeRadians(rad * (357.5291 + 0.98560028 * daysSinceJ2000));
+        const eclipticLongitude =
+          normalizeRadians(rad * (280.466 + 0.98564736 * daysSinceJ2000)) +
+          rad * (1.915 * Math.sin(meanAnomaly) + 0.02 * Math.sin(2 * meanAnomaly));
+
+        const obliquity = rad * 23.4397; // axial tilt
+        const declination = Math.asin(Math.sin(obliquity) * Math.sin(eclipticLongitude));
+        const rightAscension = Math.atan2(
+          Math.cos(obliquity) * Math.sin(eclipticLongitude),
+          Math.cos(eclipticLongitude)
+        );
+
+        const siderealTime = normalizeRadians(rad * (280.16 + 360.9856235 * daysSinceJ2000));
+        const subsolarLongitude = normalizeRadians(rightAscension - siderealTime);
+
+        const latDeg = THREE.MathUtils.radToDeg(declination);
+        const lonDeg = THREE.MathUtils.radToDeg(subsolarLongitude) - 180;
+
+        return latLonToVector3(latDeg, lonDeg, 1).normalize();
+      };
+
       const earthMaterial = new THREE.ShaderMaterial({
         uniforms: {
           dayTexture: { value: dayTexture },
@@ -706,12 +739,7 @@
       window.addEventListener('resize', onResize);
 
       const updateSunDirection = () => {
-        const now = Date.now();
-        const rotation = ((now % 86400000) / 86400000) * Math.PI * 2;
-        const axialTilt = 0.35;
-        sunDirection
-          .set(Math.cos(rotation), Math.sin(axialTilt) * Math.sin(rotation), Math.sin(rotation))
-          .normalize();
+        sunDirection.copy(computeSunDirection(new Date()));
         earthMaterial.uniforms.sunDirection.value.copy(sunDirection);
       };
 
