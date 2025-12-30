@@ -405,28 +405,31 @@
           nightGlowBoost: { value: 1.25 }
         },
         vertexShader: `
+          uniform vec3 sunDirection;
           varying vec2 vUv;
           varying vec3 vNormal;
+          varying vec3 vSunDirection;
           void main() {
             vUv = uv;
             vNormal = normalize(normalMatrix * normal);
+            vSunDirection = normalize((viewMatrix * vec4(sunDirection, 0.0)).xyz);
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
         fragmentShader: `
           uniform sampler2D dayTexture;
           uniform sampler2D nightTexture;
-          uniform vec3 sunDirection;
           uniform float ambientStrength;
           uniform float nightGlowBoost;
           varying vec2 vUv;
           varying vec3 vNormal;
+          varying vec3 vSunDirection;
 
           void main() {
             vec3 dayColor = texture2D(dayTexture, vUv).rgb;
             vec3 nightColor = texture2D(nightTexture, vUv).rgb;
 
-            float lightAmount = dot(normalize(vNormal), normalize(sunDirection));
+            float lightAmount = dot(normalize(vNormal), normalize(vSunDirection));
             float daylight = smoothstep(-0.08, 0.12, lightAmount);
             float twilight = smoothstep(-0.25, 0.0, lightAmount) * (1.0 - daylight);
 
