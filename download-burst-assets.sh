@@ -19,3 +19,4 @@ for file in "${FILES[@]}"; do
 done
 
 echo "Done. Downloaded ${#FILES[@]} files and set permissions to 755."
+echo "Reminder: update remove_oversized_torrents.py with the correct Deluge username and password."
