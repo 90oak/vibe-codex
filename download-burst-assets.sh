@@ -18,20 +18,30 @@ updated_remove_oversized=false
 get_remote_epoch() {
   local file_path="$1"
   local api_url="${COMMITS_URL}?path=${file_path}&sha=${BRANCH}&per_page=1"
-  curl -fsSL "${api_url}" | python3 - "$file_path" <<'PY'
+  local auth_header=()
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+  fi
+  if ! curl -fsSL "${auth_header[@]}" "${api_url}" | python3 - "$file_path" <<'PY'
 import json
 import sys
 from datetime import datetime
 
 path = sys.argv[1]
-data = json.load(sys.stdin)
-if not data:
-    raise SystemExit(f"No commit data for {path}")
+try:
+    data = json.load(sys.stdin)
+except json.JSONDecodeError:
+    raise SystemExit("INVALID_JSON")
+if not data or isinstance(data, dict) and data.get("message"):
+    raise SystemExit("NO_COMMIT_DATA")
 
 commit_date = data[0]["commit"]["committer"]["date"]
 epoch = int(datetime.fromisoformat(commit_date.replace("Z", "+00:00")).timestamp())
 print(epoch)
 PY
+  then
+    return 1
+  fi
 }
 
 get_local_epoch() {
@@ -47,16 +57,22 @@ for file in "${FILES[@]}"; do
   url="${BASE_URL}/${file}"
   echo "Checking ${url}"
   downloaded=false
-  remote_epoch=$(get_remote_epoch "${file}")
+  if ! remote_epoch=$(get_remote_epoch "${file}"); then
+    echo "WARN: GitHub commit lookup failed for ${file}; downloading latest copy."
+    curl -fsSL "${url}" -o "${file}"
+    downloaded=true
+  fi
   if [[ -f "${file}" ]]; then
     local_epoch=$(get_local_epoch "${file}")
-    if [[ "${remote_epoch}" -gt "${local_epoch}" ]]; then
+    if [[ -n "${remote_epoch:-}" && "${remote_epoch}" -gt "${local_epoch}" ]]; then
       curl -fsSL "${url}" -o "${file}"
       downloaded=true
     fi
   else
-    curl -fsSL "${url}" -o "${file}"
-    downloaded=true
+    if [[ "${downloaded}" != "true" ]]; then
+      curl -fsSL "${url}" -o "${file}"
+      downloaded=true
+    fi
   fi
 
   if [[ "${downloaded}" == "true" ]]; then
