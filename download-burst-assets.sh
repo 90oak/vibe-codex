@@ -23,7 +23,16 @@ get_remote_epoch() {
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
   fi
-  if ! curl -fsSL "${api_headers[@]}" "${auth_header[@]}" "${api_url}" | python3 - "$file_path" <<'PY'
+  local response
+  local status
+  response=$(curl -sS -w '\n%{http_code}' "${api_headers[@]}" "${auth_header[@]}" "${api_url}") || return 1
+  status="${response##*$'\n'}"
+  response="${response%$'\n'*}"
+  if [[ -z "${response}" || "${status}" -lt 200 || "${status}" -ge 300 ]]; then
+    echo "WARN: GitHub API returned status ${status} for ${file_path}." >&2
+    return 1
+  fi
+  if ! python3 - "$file_path" <<'PY' <<<"${response}"
 import json
 import sys
 from datetime import datetime
