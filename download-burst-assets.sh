@@ -32,7 +32,10 @@ get_remote_epoch() {
     echo "WARN: GitHub API returned status ${status} for ${file_path}." >&2
     return 1
   fi
-  if ! python3 - "$file_path" <<'PY' <<<"${response}"
+  local response_file
+  response_file="$(mktemp)"
+  printf '%s' "${response}" > "${response_file}"
+  if ! python3 - "$file_path" <<'PY' <"${response_file}"
 import json
 import sys
 from datetime import datetime
@@ -50,8 +53,10 @@ epoch = int(datetime.fromisoformat(commit_date.replace("Z", "+00:00")).timestamp
 print(epoch)
 PY
   then
+    rm -f "${response_file}"
     return 1
   fi
+  rm -f "${response_file}"
 }
 
 get_local_epoch() {
