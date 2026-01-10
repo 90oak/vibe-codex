@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="example/vibe-codex"
+REPO="90oak/vibe-codex"
 BRANCH="main"
 
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -18,7 +18,7 @@ updated_remove_oversized=false
 get_remote_epoch() {
   local file_path="$1"
   local api_url="${COMMITS_URL}?path=${file_path}&sha=${BRANCH}&per_page=1"
-  curl -fsSL "${api_url}" | python - "$file_path" <<'PY'
+  curl -fsSL "${api_url}" | python3 - "$file_path" <<'PY'
 import json
 import sys
 from datetime import datetime
@@ -34,13 +34,22 @@ print(epoch)
 PY
 }
 
+get_local_epoch() {
+  local file_path="$1"
+  if stat -c %Y "${file_path}" >/dev/null 2>&1; then
+    stat -c %Y "${file_path}"
+  else
+    stat -f %m "${file_path}"
+  fi
+}
+
 for file in "${FILES[@]}"; do
   url="${BASE_URL}/${file}"
   echo "Checking ${url}"
   downloaded=false
   remote_epoch=$(get_remote_epoch "${file}")
   if [[ -f "${file}" ]]; then
-    local_epoch=$(stat -c %Y "${file}")
+    local_epoch=$(get_local_epoch "${file}")
     if [[ "${remote_epoch}" -gt "${local_epoch}" ]]; then
       curl -fsSL "${url}" -o "${file}"
       downloaded=true
