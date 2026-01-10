@@ -35,7 +35,7 @@ get_remote_epoch() {
   local response_file
   response_file="$(mktemp)"
   printf '%s' "${response}" > "${response_file}"
-  if ! python3 - "$file_path" "${response_file}" <<'PY'
+  if ! python3 -c '
 import json
 import sys
 from datetime import datetime
@@ -53,7 +53,7 @@ if not data or isinstance(data, dict) and data.get("message"):
 commit_date = data[0]["commit"]["committer"]["date"]
 epoch = int(datetime.fromisoformat(commit_date.replace("Z", "+00:00")).timestamp())
 print(epoch)
-PY
+' "$file_path" "${response_file}"
   then
     rm -f "${response_file}"
     return 1
