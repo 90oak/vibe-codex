@@ -19,10 +19,11 @@ get_remote_epoch() {
   local file_path="$1"
   local api_url="${COMMITS_URL}?path=${file_path}&sha=${BRANCH}&per_page=1"
   local auth_header=()
+  local api_headers=(-H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "User-Agent: vibe-codex-download")
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
   fi
-  if ! curl -fsSL "${auth_header[@]}" "${api_url}" | python3 - "$file_path" <<'PY'
+  if ! curl -fsSL "${api_headers[@]}" "${auth_header[@]}" "${api_url}" | python3 - "$file_path" <<'PY'
 import json
 import sys
 from datetime import datetime
