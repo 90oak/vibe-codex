@@ -35,14 +35,16 @@ get_remote_epoch() {
   local response_file
   response_file="$(mktemp)"
   printf '%s' "${response}" > "${response_file}"
-  if ! python3 - "$file_path" <<'PY' <"${response_file}"
+  if ! python3 - "$file_path" "${response_file}" <<'PY'
 import json
 import sys
 from datetime import datetime
 
 path = sys.argv[1]
+response_path = sys.argv[2]
 try:
-    data = json.load(sys.stdin)
+    with open(response_path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
 except json.JSONDecodeError:
     raise SystemExit("INVALID_JSON")
 if not data or isinstance(data, dict) and data.get("message"):
