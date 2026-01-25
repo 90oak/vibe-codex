@@ -530,7 +530,10 @@
         const cells = buildGrid(cellSizeKm);
         distributeInventory(cells);
 
-        const maxSqft = Math.max(...cells.map((c) => c.sqft));
+        const sqftValues = cells.map((c) => c.sqft);
+        const maxSqft = Math.max(...sqftValues);
+        const sortedSqft = [...sqftValues].sort((a, b) => a - b);
+        const medianSqft = sortedSqft[Math.floor(sortedSqft.length / 2)];
 
         gridLayer.clearLayers();
         if (lockedTooltip) {
@@ -539,6 +542,9 @@
         }
 
         cells.forEach((cell) => {
+          if (cell.sqft < medianSqft) {
+            return;
+          }
           const color = colorForValue(cell.sqft, maxSqft, intensity);
           const southWestPoint = map.latLngToLayerPoint(cell.bounds[0]);
           const northEastPoint = map.latLngToLayerPoint(cell.bounds[1]);
