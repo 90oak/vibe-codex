@@ -298,6 +298,14 @@
           <div class="control-note">Grid cells are fixed at 1&nbsp;km squares for consistent comparisons.</div>
         </div>
         <div class="control-group">
+          <label for="density">
+            Density filter
+            <span id="densityValue">100% shown</span>
+          </label>
+          <input id="density" type="range" min="0" max="100" step="5" value="0" />
+          <div class="control-note">Slide right to keep only the densest grid cells (or hide them all).</div>
+        </div>
+        <div class="control-group">
           <label for="intensity">
             Intensity scaling
             <span id="intensityValue">1.0×</span>
@@ -386,6 +394,8 @@
       const gridLayer = L.layerGroup().addTo(map);
       const focusLayer = L.layerGroup().addTo(map);
 
+      const densityInput = document.getElementById("density");
+      const densityValue = document.getElementById("densityValue");
       const intensityInput = document.getElementById("intensity");
       const intensityValue = document.getElementById("intensityValue");
       const totalOfficeEl = document.getElementById("totalOffice");
@@ -524,8 +534,11 @@
         const maxCells = L.Browser.mobile ? 900 : 3000;
         const cellSizeKm = estimateCellSizeKm(maxCells);
         const intensity = Number(intensityInput.value);
+        const densityCutoff = Number(densityInput.value);
 
         intensityValue.textContent = `${intensity.toFixed(1)}×`;
+        densityValue.textContent =
+          densityCutoff === 100 ? "0% shown" : `${100 - densityCutoff}% shown`;
 
         const cells = buildGrid(cellSizeKm);
         distributeInventory(cells);
@@ -533,7 +546,16 @@
         const sqftValues = cells.map((c) => c.sqft);
         const maxSqft = Math.max(...sqftValues);
         const sortedSqft = [...sqftValues].sort((a, b) => a - b);
-        const medianSqft = sortedSqft[Math.floor(sortedSqft.length / 2)];
+        let minSqft = sortedSqft[0];
+        if (densityCutoff === 100) {
+          minSqft = Number.POSITIVE_INFINITY;
+        } else if (densityCutoff > 0) {
+          const cutoffIndex = Math.min(
+            sortedSqft.length - 1,
+            Math.floor((densityCutoff / 100) * sortedSqft.length)
+          );
+          minSqft = sortedSqft[cutoffIndex];
+        }
 
         gridLayer.clearLayers();
         if (lockedTooltip) {
@@ -542,7 +564,7 @@
         }
 
         cells.forEach((cell) => {
-          if (cell.sqft < medianSqft) {
+          if (cell.sqft < minSqft) {
             return;
           }
           const color = colorForValue(cell.sqft, maxSqft, intensity);
@@ -593,6 +615,7 @@
         updateStats(cells);
       };
 
+      densityInput.addEventListener("input", renderGrid);
       intensityInput.addEventListener("input", renderGrid);
       map.on("zoomend moveend", renderGrid);
 
