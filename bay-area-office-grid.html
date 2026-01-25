@@ -20,6 +20,7 @@
         --muted: #9fb0d9;
         --accent: #7dd3fc;
         --grid-stroke: rgba(170, 210, 255, 0.24);
+        --pillar-shadow: rgba(10, 15, 25, 0.35);
       }
 
       html,
@@ -158,10 +159,13 @@
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: linear-gradient(
           90deg,
-          rgba(125, 211, 252, 0.12),
-          rgba(125, 211, 252, 0.38),
-          rgba(125, 211, 252, 0.75),
-          rgba(14, 116, 255, 0.95)
+          #ff3b30,
+          #ff9500,
+          #ffcc00,
+          #34c759,
+          #007aff,
+          #5856d6,
+          #af52de
         );
       }
 
@@ -211,6 +215,44 @@
         color: #fff;
       }
 
+      .pillar-icon {
+        border-radius: 4px;
+        transform-origin: bottom center;
+        pointer-events: none;
+      }
+
+      .pillar {
+        position: relative;
+        width: var(--pillar-size);
+        height: calc(var(--pillar-size) + var(--pillar-height));
+        transform: translateY(calc(-1 * var(--pillar-height)));
+      }
+
+      .pillar .pillar-top {
+        position: absolute;
+        bottom: var(--pillar-height);
+        left: 0;
+        width: var(--pillar-size);
+        height: var(--pillar-size);
+        background: var(--pillar-color);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 6px 16px var(--pillar-shadow);
+        transform: perspective(220px) rotateX(55deg);
+        transform-origin: center bottom;
+      }
+
+      .pillar .pillar-body {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: var(--pillar-size);
+        height: var(--pillar-height);
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.35));
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: none;
+        background-color: color-mix(in srgb, var(--pillar-color) 75%, #000);
+      }
+
       @media (max-width: 860px) {
         #controls {
           position: static;
@@ -240,7 +282,7 @@
       <h1>San Francisco Bay Area Office Space Grid</h1>
       <p>
         A gridded cartogram overlay that approximates office square footage across the Bay Area. The map uses a
-        5&nbsp;km base grid and distributes metro-level inventory estimates into grid cells using proximity to known
+        1&nbsp;km base grid and distributes metro-level inventory estimates into grid cells using proximity to known
         employment centers.
       </p>
     </header>
@@ -249,12 +291,11 @@
       <div id="controls" class="panel">
         <h2>Grid configuration</h2>
         <div class="control-group">
-          <label for="cellSize">
+          <label>
             Cell size
-            <span id="cellSizeValue">5.0 km</span>
+            <span id="cellSizeValue">1.0 km</span>
           </label>
-          <input id="cellSize" type="range" min="3" max="10" step="0.5" value="5" />
-          <div class="control-note">Smaller cells increase detail but reduce the stability of the estimate.</div>
+          <div class="control-note">Grid cells are fixed at 1&nbsp;km squares for consistent comparisons.</div>
         </div>
         <div class="control-group">
           <label for="intensity">
@@ -345,9 +386,7 @@
       const gridLayer = L.layerGroup().addTo(map);
       const focusLayer = L.layerGroup().addTo(map);
 
-      const cellSizeInput = document.getElementById("cellSize");
       const intensityInput = document.getElementById("intensity");
-      const cellSizeValue = document.getElementById("cellSizeValue");
       const intensityValue = document.getElementById("intensityValue");
       const totalOfficeEl = document.getElementById("totalOffice");
       const cellCountEl = document.getElementById("cellCount");
@@ -376,13 +415,13 @@
 
       const colorForValue = (value, domainMax, intensity) => {
         if (!domainMax || value <= 0) {
-          return "rgba(125, 211, 252, 0.06)";
+          return "rgba(255, 59, 48, 0.12)";
         }
-        const normalized = Math.min(1, Math.pow(value / domainMax, 0.65) * intensity);
-        const hue = 205 - normalized * 18;
-        const sat = 78 + normalized * 10;
-        const light = 18 + normalized * 36;
-        const alpha = 0.18 + normalized * 0.67;
+        const normalized = Math.min(1, Math.pow(value / domainMax, 0.75) * intensity);
+        const hue = normalized * 275;
+        const sat = 85;
+        const light = 52 - normalized * 6;
+        const alpha = 0.32 + normalized * 0.6;
         return `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
       };
 
@@ -473,10 +512,9 @@
       };
 
       const renderGrid = () => {
-        const cellSizeKm = Number(cellSizeInput.value);
+        const cellSizeKm = 1;
         const intensity = Number(intensityInput.value);
 
-        cellSizeValue.textContent = `${cellSizeKm.toFixed(1)} km`;
         intensityValue.textContent = `${intensity.toFixed(1)}×`;
 
         const cells = buildGrid(cellSizeKm);
@@ -492,14 +530,24 @@
 
         cells.forEach((cell) => {
           const color = colorForValue(cell.sqft, maxSqft, intensity);
-          const rect = L.rectangle(cell.bounds, {
-            stroke: true,
-            weight: 0.7,
-            color: "rgba(170, 210, 255, 0.24)",
-            fillColor: color,
-            fillOpacity: 0.85,
-            interactive: true
-          }).addTo(gridLayer);
+          const southWestPoint = map.latLngToLayerPoint(cell.bounds[0]);
+          const northEastPoint = map.latLngToLayerPoint(cell.bounds[1]);
+          const baseSize = Math.max(10, Math.abs(northEastPoint.x - southWestPoint.x));
+          const heightPx = Math.max(6, Math.round((cell.sqft / maxSqft) * 80));
+
+          const icon = L.divIcon({
+            className: "pillar-icon",
+            html: `
+              <div class="pillar" style="--pillar-color:${color};--pillar-size:${baseSize}px;--pillar-height:${heightPx}px;">
+                <div class="pillar-top"></div>
+                <div class="pillar-body"></div>
+              </div>
+            `,
+            iconSize: [baseSize, baseSize + heightPx],
+            iconAnchor: [baseSize / 2, baseSize + heightPx]
+          });
+
+          const marker = L.marker(cell.center, { icon }).addTo(gridLayer);
 
           const tooltipHtml = `
             <div class="tooltip-title">Estimated office inventory</div>
@@ -509,19 +557,19 @@
             )}, ${cell.center.lng.toFixed(3)}</div>
           `;
 
-          rect.bindTooltip(tooltipHtml, {
+          marker.bindTooltip(tooltipHtml, {
             sticky: true,
             opacity: 0.96,
             className: "office-tooltip"
           });
 
-          rect.on("click", (event) => {
+          marker.on("click", (event) => {
             if (lockedTooltip) {
               map.closeTooltip(lockedTooltip);
               lockedTooltip = null;
             }
-            const tooltip = rect.getTooltip();
-            rect.openTooltip(event.latlng);
+            const tooltip = marker.getTooltip();
+            marker.openTooltip(event.latlng);
             lockedTooltip = tooltip;
           });
         });
@@ -529,8 +577,8 @@
         updateStats(cells);
       };
 
-      cellSizeInput.addEventListener("input", renderGrid);
       intensityInput.addEventListener("input", renderGrid);
+      map.on("zoomend moveend", renderGrid);
 
       addMetroMarkers();
       renderGrid();
