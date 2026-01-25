@@ -511,8 +511,18 @@
         legendMaxEl.textContent = formatSqft(peak);
       };
 
+      const estimateCellSizeKm = (maxCells) => {
+        const midLat = (bayBounds.north + bayBounds.south) / 2;
+        const latKm = (bayBounds.north - bayBounds.south) * kmPerDegreeLat;
+        const lngKm = (bayBounds.east - bayBounds.west) * kmPerDegreeLng(midLat);
+        const totalArea = latKm * lngKm;
+        const targetCellArea = totalArea / maxCells;
+        return Math.max(1.5, Math.sqrt(targetCellArea));
+      };
+
       const renderGrid = () => {
-        const cellSizeKm = 1;
+        const maxCells = L.Browser.mobile ? 900 : 3000;
+        const cellSizeKm = estimateCellSizeKm(maxCells);
         const intensity = Number(intensityInput.value);
 
         intensityValue.textContent = `${intensity.toFixed(1)}×`;
