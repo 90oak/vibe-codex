@@ -38,6 +38,13 @@
         --floor-top: calc(var(--floor-bottom) + var(--floor-height));
       }
 
+      .game-shell,
+      .game-shell * {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+
       .hud {
         position: absolute;
         inset: 20px 24px auto;
