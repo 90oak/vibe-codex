@@ -268,6 +268,29 @@
       game.addEventListener("pointercancel", stopHolding);
       game.addEventListener("pointerleave", stopHolding);
 
+      const handleSpaceDown = (event) => {
+        if (event.code !== "Space" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        if (state.isHolding) {
+          return;
+        }
+        state.isHolding = true;
+        jump();
+      };
+
+      const handleSpaceUp = (event) => {
+        if (event.code !== "Space" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        stopHolding();
+      };
+
+      window.addEventListener("keydown", handleSpaceDown);
+      window.addEventListener("keyup", handleSpaceUp);
+
       requestAnimationFrame(update);
     </script>
   </body>
