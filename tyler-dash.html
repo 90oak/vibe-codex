@@ -170,7 +170,7 @@
     <main class="game-shell" id="game">
       <div class="hud">
         <div class="title">Tyler Dash</div>
-        <div class="subtitle">Tap or click to hop over the track.</div>
+        <div class="subtitle">Tap to hop. Press & hold to chain jumps.</div>
       </div>
       <div class="lane">
         <div class="cube" id="cube"></div>
@@ -178,7 +178,7 @@
       <div class="floor-shadow"></div>
       <div class="floor"></div>
       <div class="ground-plane"></div>
-      <div class="touch-hint">Tap / Click to hop</div>
+      <div class="touch-hint">Tap to hop • Press &amp; hold to chain jumps</div>
     </main>
 
     <script>
@@ -189,6 +189,7 @@
         y: 0,
         velocity: 0,
         isJumping: false,
+        isHolding: false,
         rotation: 0,
         rotationStart: 0,
         rotationTarget: 0,
@@ -213,6 +214,9 @@
             state.isJumping = false;
             state.rotation = state.rotationTarget % 360;
             state.airFrame = 0;
+            if (state.isHolding) {
+              jump();
+            }
           }
         }
 
@@ -231,9 +235,31 @@
       };
 
       game.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) {
+          return;
+        }
         event.preventDefault();
+        state.isHolding = true;
+        game.setPointerCapture(event.pointerId);
         jump();
       });
+
+      const stopHolding = () => {
+        state.isHolding = false;
+      };
+
+      game.addEventListener("pointerup", (event) => {
+        if (event.button !== 0) {
+          return;
+        }
+        if (game.hasPointerCapture(event.pointerId)) {
+          game.releasePointerCapture(event.pointerId);
+        }
+        stopHolding();
+      });
+
+      game.addEventListener("pointercancel", stopHolding);
+      game.addEventListener("pointerleave", stopHolding);
 
       requestAnimationFrame(update);
     </script>
