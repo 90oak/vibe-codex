@@ -36,6 +36,7 @@
         --floor-bottom: 70px;
         --floor-height: 90px;
         --floor-top: calc(var(--floor-bottom) + var(--floor-height));
+        --floor-grid: 16px;
       }
 
       .game-shell,
@@ -96,14 +97,21 @@
         bottom: var(--floor-bottom);
         height: var(--floor-height);
         background: repeating-linear-gradient(
-            120deg,
+            0deg,
             rgba(83, 209, 255, 0.35) 0px,
-            rgba(83, 209, 255, 0.35) 20px,
-            rgba(16, 25, 38, 0.8) 20px,
-            rgba(16, 25, 38, 0.8) 48px
+            rgba(83, 209, 255, 0.35) 1px,
+            transparent 1px,
+            transparent var(--floor-grid)
+          ),
+          repeating-linear-gradient(
+            90deg,
+            rgba(83, 209, 255, 0.35) 0px,
+            rgba(83, 209, 255, 0.35) 1px,
+            transparent 1px,
+            transparent var(--floor-grid)
           ),
           linear-gradient(180deg, #1f3346 0%, #0b1622 100%);
-        animation: floor-slide 1.6s linear infinite;
+        animation: floor-slide 2.4s linear infinite;
       }
 
       .floor::after {
