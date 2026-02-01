@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tyler Dash</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #1f2b3a 0%, #0b111a 60%, #05070b 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .game-shell {
+        width: min(960px, 100%);
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(180deg, rgba(16, 22, 32, 0.9) 0%, rgba(10, 14, 22, 0.95) 50%, rgba(8, 10, 16, 1) 100%);
+        border: 2px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+        touch-action: manipulation;
+      }
+
+      .hud {
+        position: absolute;
+        inset: 20px 24px auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 3;
+      }
+
+      .title {
+        font-size: clamp(1.4rem, 3vw, 2.2rem);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #d9f6ff;
+      }
+
+      .subtitle {
+        font-size: clamp(0.85rem, 2vw, 1rem);
+        color: rgba(217, 246, 255, 0.65);
+      }
+
+      .lane {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding-left: clamp(24px, 6vw, 80px);
+      }
+
+      .cube {
+        width: clamp(48px, 7vw, 72px);
+        height: clamp(48px, 7vw, 72px);
+        background: linear-gradient(145deg, #8ff0ff 0%, #39b6ff 35%, #1b4bd6 100%);
+        border-radius: 10px;
+        box-shadow: 0 18px 35px rgba(34, 94, 185, 0.45);
+        position: absolute;
+        left: clamp(24px, 6vw, 80px);
+        bottom: 110px;
+        transform: translateY(0);
+      }
+
+      .floor {
+        position: absolute;
+        left: 0;
+        right: -200%;
+        bottom: 70px;
+        height: 90px;
+        background: repeating-linear-gradient(
+            120deg,
+            rgba(83, 209, 255, 0.35) 0px,
+            rgba(83, 209, 255, 0.35) 20px,
+            rgba(16, 25, 38, 0.8) 20px,
+            rgba(16, 25, 38, 0.8) 48px
+          ),
+          linear-gradient(180deg, #1f3346 0%, #0b1622 100%);
+        animation: floor-slide 1.6s linear infinite;
+      }
+
+      .floor::after {
+        content: "";
+        position: absolute;
+        inset: -12px 0 auto;
+        height: 12px;
+        background: linear-gradient(90deg, rgba(83, 209, 255, 0.65), rgba(83, 209, 255, 0));
+      }
+
+      .floor-shadow {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 70px;
+        height: 20px;
+        background: radial-gradient(circle at 30% 0%, rgba(143, 240, 255, 0.6), transparent 70%);
+        opacity: 0.5;
+        filter: blur(6px);
+      }
+
+      .ground-plane {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 120px;
+        background: linear-gradient(180deg, rgba(9, 16, 26, 0) 0%, rgba(8, 13, 22, 0.85) 60%, rgba(5, 8, 13, 1) 100%);
+      }
+
+      .touch-hint {
+        position: absolute;
+        bottom: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.9rem;
+        color: rgba(217, 246, 255, 0.6);
+        text-align: center;
+        z-index: 2;
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: rgba(6, 12, 20, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      @keyframes floor-slide {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+
+      @media (max-width: 600px) {
+        .game-shell {
+          border-radius: 0;
+          height: 100vh;
+          width: 100%;
+          aspect-ratio: auto;
+        }
+
+        .touch-hint {
+          bottom: 12px;
+          font-size: 0.8rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-shell" id="game">
+      <div class="hud">
+        <div class="title">Tyler Dash</div>
+        <div class="subtitle">Tap or click to hop over the track.</div>
+      </div>
+      <div class="lane">
+        <div class="cube" id="cube"></div>
+      </div>
+      <div class="floor-shadow"></div>
+      <div class="floor"></div>
+      <div class="ground-plane"></div>
+      <div class="touch-hint">Tap / Click to hop</div>
+    </main>
+
+    <script>
+      const cube = document.getElementById("cube");
+      const game = document.getElementById("game");
+
+      const state = {
+        y: 0,
+        velocity: 0,
+        isJumping: false,
+      };
+
+      const gravity = -0.9;
+      const jumpVelocity = 15;
+
+      const update = () => {
+        if (state.isJumping) {
+          state.velocity += gravity;
+          state.y += state.velocity;
+
+          if (state.y <= 0) {
+            state.y = 0;
+            state.velocity = 0;
+            state.isJumping = false;
+          }
+        }
+
+        cube.style.transform = `translateY(${-state.y}px)`;
+        requestAnimationFrame(update);
+      };
+
+      const jump = () => {
+        if (!state.isJumping) {
+          state.isJumping = true;
+          state.velocity = jumpVelocity;
+        }
+      };
+
+      game.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        jump();
+      });
+
+      requestAnimationFrame(update);
+    </script>
+  </body>
+</html>
