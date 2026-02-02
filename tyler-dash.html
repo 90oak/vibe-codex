@@ -294,9 +294,12 @@
           return;
         }
         state.isGameOver = true;
+        state.isJumping = false;
         state.isHolding = false;
+        state.velocity = 0;
+        state.rotationStart = state.rotation;
+        state.rotationTarget = state.rotation;
         gameMessage.classList.add("is-visible");
-        setTimeout(resetGame, 1500);
       };
 
       const checkCollision = (cubeRect, obstacleRect) => {
@@ -367,7 +370,7 @@
       };
 
       const jump = () => {
-        if (!state.isJumping) {
+        if (!state.isJumping && !state.isGameOver) {
           state.isJumping = true;
           state.velocity = jumpVelocity;
           state.airFrame = 0;
@@ -378,6 +381,9 @@
 
       game.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) {
+          return;
+        }
+        if (state.isGameOver) {
           return;
         }
         event.preventDefault();
@@ -408,6 +414,9 @@
           return;
         }
         event.preventDefault();
+        if (state.isGameOver) {
+          return;
+        }
         if (state.isHolding) {
           return;
         }
