@@ -250,7 +250,7 @@
       };
 
       const gravity = -0.9;
-      const jumpVelocity = 15;
+      const jumpVelocity = 16.05;
       const totalAirFrames = Math.ceil((2 * jumpVelocity) / -gravity);
       const obstacleIntervalMs = 3000;
       const obstacleSpeed = 480;
@@ -264,8 +264,9 @@
         const obstacle = document.createElement("div");
         obstacle.className = "spike";
         const cubeSize = cube.getBoundingClientRect().width;
-        obstacle.style.width = `${cubeSize}px`;
-        obstacle.style.height = `${cubeSize}px`;
+        const spikeScale = Math.sqrt(0.75);
+        obstacle.style.width = `${cubeSize * spikeScale}px`;
+        obstacle.style.height = `${cubeSize * spikeScale}px`;
         const startX = game.clientWidth + obstaclePadding;
         obstacle.dataset.x = startX.toString();
         obstacle.style.transform = `translateX(${startX}px)`;
