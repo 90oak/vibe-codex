@@ -91,6 +91,38 @@
         transform-origin: center;
       }
 
+      .spike {
+        position: absolute;
+        bottom: var(--floor-top);
+        width: clamp(48px, 7vw, 72px);
+        height: clamp(48px, 7vw, 72px);
+        background: linear-gradient(145deg, #ff7c8c 0%, #f7435a 45%, #c21b37 100%);
+        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        filter: drop-shadow(0 10px 14px rgba(255, 86, 107, 0.45));
+      }
+
+      .game-message {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(1.8rem, 4vw, 3rem);
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #ff9fb0;
+        background: rgba(5, 7, 11, 0.65);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 4;
+      }
+
+      .game-message.is-visible {
+        opacity: 1;
+      }
+
       .floor {
         position: absolute;
         left: 0;
@@ -193,6 +225,7 @@
       <div class="lane">
         <div class="cube" id="cube"></div>
       </div>
+      <div class="game-message" id="gameMessage">Game Over</div>
       <div class="floor-shadow"></div>
       <div class="floor"></div>
       <div class="ground-plane"></div>
@@ -202,6 +235,7 @@
     <script>
       const cube = document.getElementById("cube");
       const game = document.getElementById("game");
+      const gameMessage = document.getElementById("gameMessage");
 
       const state = {
         y: 0,
@@ -212,13 +246,74 @@
         rotationStart: 0,
         rotationTarget: 0,
         airFrame: 0,
+        isGameOver: false,
       };
 
       const gravity = -0.9;
       const jumpVelocity = 15;
       const totalAirFrames = Math.ceil((2 * jumpVelocity) / -gravity);
+      const obstacleIntervalMs = 3000;
+      const obstacleSpeed = 480;
+      const obstaclePadding = 24;
+      const obstacles = [];
 
-      const update = () => {
+      let lastFrameTime = 0;
+      let obstacleTimer = 0;
+
+      const spawnObstacle = () => {
+        const obstacle = document.createElement("div");
+        obstacle.className = "spike";
+        const cubeSize = cube.getBoundingClientRect().width;
+        obstacle.style.width = `${cubeSize}px`;
+        obstacle.style.height = `${cubeSize}px`;
+        const startX = game.clientWidth + obstaclePadding;
+        obstacle.dataset.x = startX.toString();
+        obstacle.style.transform = `translateX(${startX}px)`;
+        game.appendChild(obstacle);
+        obstacles.push(obstacle);
+      };
+
+      const resetGame = () => {
+        state.y = 0;
+        state.velocity = 0;
+        state.isJumping = false;
+        state.isHolding = false;
+        state.rotation = 0;
+        state.rotationStart = 0;
+        state.rotationTarget = 0;
+        state.airFrame = 0;
+        state.isGameOver = false;
+        obstacleTimer = 0;
+        obstacles.splice(0).forEach((obstacle) => obstacle.remove());
+        gameMessage.classList.remove("is-visible");
+      };
+
+      const triggerGameOver = () => {
+        if (state.isGameOver) {
+          return;
+        }
+        state.isGameOver = true;
+        state.isHolding = false;
+        gameMessage.classList.add("is-visible");
+        setTimeout(resetGame, 1500);
+      };
+
+      const checkCollision = (cubeRect, obstacleRect) => {
+        return !(
+          cubeRect.right < obstacleRect.left + 6 ||
+          cubeRect.left > obstacleRect.right - 6 ||
+          cubeRect.bottom < obstacleRect.top + 6 ||
+          cubeRect.top > obstacleRect.bottom - 6
+        );
+      };
+
+      const update = (time) => {
+        if (!lastFrameTime) {
+          lastFrameTime = time;
+        }
+        const delta = Math.min((time - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = time;
+
         if (state.isJumping) {
           state.velocity += gravity;
           state.y += state.velocity;
@@ -239,6 +334,34 @@
         }
 
         cube.style.transform = `translateY(${-state.y}px) rotate(${state.rotation}deg)`;
+        if (!state.isGameOver) {
+          obstacleTimer += delta * 1000;
+          if (obstacleTimer >= obstacleIntervalMs) {
+            obstacleTimer = 0;
+            spawnObstacle();
+          }
+
+          const cubeRect = cube.getBoundingClientRect();
+          for (let i = obstacles.length - 1; i >= 0; i -= 1) {
+            const obstacle = obstacles[i];
+            const currentX = Number(obstacle.dataset.x || 0);
+            const nextX = currentX - obstacleSpeed * delta;
+            obstacle.dataset.x = nextX.toString();
+            obstacle.style.transform = `translateX(${nextX}px)`;
+
+            if (nextX < -obstaclePadding * 2) {
+              obstacle.remove();
+              obstacles.splice(i, 1);
+              continue;
+            }
+
+            const obstacleRect = obstacle.getBoundingClientRect();
+            if (checkCollision(cubeRect, obstacleRect)) {
+              triggerGameOver();
+            }
+          }
+        }
+
         requestAnimationFrame(update);
       };
 
