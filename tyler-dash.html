@@ -56,6 +56,58 @@
         z-index: 3;
       }
 
+      .scoreboard {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      .score-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 224, 138, 0.75);
+      }
+
+      .score-value {
+        position: relative;
+        font-size: clamp(1.6rem, 4vw, 2.6rem);
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: #ffd572;
+        text-shadow: 0 0 12px rgba(255, 213, 114, 0.6);
+        padding-right: 14px;
+      }
+
+      .score-value::before,
+      .score-value::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -4px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 233, 173, 0.9), rgba(255, 233, 173, 0));
+        transform: translateY(-50%) scale(0.6);
+        opacity: 0.7;
+        animation: sparkle 1.6s ease-in-out infinite;
+      }
+
+      .score-value::after {
+        width: 18px;
+        height: 18px;
+        right: -16px;
+        animation-delay: 0.4s;
+        opacity: 0.5;
+      }
+
       .title {
         font-size: clamp(1.4rem, 3vw, 2.2rem);
         font-weight: 700;
@@ -149,6 +201,10 @@
         animation: floor-slide var(--floor-speed) linear infinite;
       }
 
+      .game-shell.is-paused .floor {
+        animation-play-state: paused;
+      }
+
       .floor::after {
         content: "";
         position: absolute;
@@ -201,6 +257,18 @@
         }
       }
 
+      @keyframes sparkle {
+        0%,
+        100% {
+          transform: translateY(-50%) scale(0.6);
+          opacity: 0.4;
+        }
+        50% {
+          transform: translateY(-60%) scale(1);
+          opacity: 0.9;
+        }
+      }
+
       @media (max-width: 600px) {
         .game-shell {
           border-radius: 0;
@@ -222,6 +290,10 @@
         <div class="title">Tyler Dash</div>
         <div class="subtitle">Tap to hop. Press & hold to chain jumps.</div>
       </div>
+      <div class="scoreboard">
+        <div class="score-label">Score</div>
+        <div class="score-value" id="scoreValue">0</div>
+      </div>
       <div class="lane">
         <div class="cube" id="cube"></div>
       </div>
@@ -236,6 +308,7 @@
       const cube = document.getElementById("cube");
       const game = document.getElementById("game");
       const gameMessage = document.getElementById("gameMessage");
+      const scoreValue = document.getElementById("scoreValue");
 
       const state = {
         y: 0,
@@ -247,6 +320,7 @@
         rotationTarget: 0,
         airFrame: 0,
         isGameOver: false,
+        score: 0,
       };
 
       const gravity = -0.9;
@@ -274,6 +348,10 @@
         obstacles.push(obstacle);
       };
 
+      const updateScore = () => {
+        scoreValue.textContent = state.score.toString();
+      };
+
       const resetGame = () => {
         state.y = 0;
         state.velocity = 0;
@@ -284,9 +362,12 @@
         state.rotationTarget = 0;
         state.airFrame = 0;
         state.isGameOver = false;
+        state.score = 0;
         obstacleTimer = 0;
         obstacles.splice(0).forEach((obstacle) => obstacle.remove());
         gameMessage.classList.remove("is-visible");
+        game.classList.remove("is-paused");
+        updateScore();
       };
 
       const triggerGameOver = () => {
@@ -300,6 +381,7 @@
         state.rotationStart = state.rotation;
         state.rotationTarget = state.rotation;
         gameMessage.classList.add("is-visible");
+        game.classList.add("is-paused");
       };
 
       const checkCollision = (cubeRect, obstacleRect) => {
@@ -362,6 +444,14 @@
             const obstacleRect = obstacle.getBoundingClientRect();
             if (checkCollision(cubeRect, obstacleRect)) {
               triggerGameOver();
+            }
+
+            if (!state.isGameOver && !obstacle.dataset.scored && obstacleRect.right < cubeRect.left) {
+              if (state.y > 0) {
+                state.score += 1;
+                updateScore();
+              }
+              obstacle.dataset.scored = "true";
             }
           }
         }
