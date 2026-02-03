@@ -172,7 +172,7 @@
         padding-left: clamp(24px, 6vw, 80px);
       }
 
-      .cube {
+      .square {
         width: clamp(48px, 7vw, 72px);
         height: clamp(48px, 7vw, 72px);
         background: linear-gradient(145deg, #8ff0ff 0%, #39b6ff 35%, #1b4bd6 100%);
@@ -183,6 +183,16 @@
         bottom: var(--floor-top);
         transform: translateY(0);
         transform-origin: center;
+      }
+
+      .cube {
+        position: absolute;
+        bottom: var(--floor-top);
+        width: clamp(46px, 6.8vw, 70px);
+        height: clamp(46px, 6.8vw, 70px);
+        background: linear-gradient(145deg, #8b98ff 0%, #566dff 45%, #2b3fe0 100%);
+        border-radius: 2px;
+        box-shadow: 0 16px 28px rgba(61, 82, 214, 0.5);
       }
 
       .spike {
@@ -211,10 +221,32 @@
         pointer-events: none;
         transition: opacity 0.2s ease;
         z-index: 4;
+        flex-direction: column;
+        gap: 16px;
       }
 
       .game-message.is-visible {
         opacity: 1;
+        pointer-events: auto;
+      }
+
+      .retry-button {
+        border: none;
+        border-radius: 999px;
+        padding: 12px 26px;
+        font-size: 0.95rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #07101b;
+        background: linear-gradient(135deg, #ffd86f 0%, #ffb347 60%, #ff9b55 100%);
+        box-shadow: 0 14px 24px rgba(255, 184, 91, 0.35);
+        cursor: pointer;
+      }
+
+      .retry-button:focus-visible {
+        outline: 3px solid rgba(255, 216, 111, 0.6);
+        outline-offset: 4px;
       }
 
       .floor {
@@ -364,9 +396,12 @@
         </div>
       </div>
       <div class="lane">
-        <div class="cube" id="cube"></div>
+        <div class="square" id="square"></div>
       </div>
-      <div class="game-message" id="gameMessage">Game Over</div>
+      <div class="game-message" id="gameMessage">
+        <div>Game Over</div>
+        <button class="retry-button" id="retryButton" type="button">Retry</button>
+      </div>
       <div class="floor-shadow"></div>
       <div class="floor"></div>
       <div class="ground-plane"></div>
@@ -374,10 +409,11 @@
     </main>
 
     <script>
-      const cube = document.getElementById("cube");
+      const square = document.getElementById("square");
       const game = document.getElementById("game");
       const gameMessage = document.getElementById("gameMessage");
       const scoreValue = document.getElementById("scoreValue");
+      const retryButton = document.getElementById("retryButton");
 
       const state = {
         y: 0,
@@ -387,8 +423,11 @@
         rotation: 0,
         rotationStart: 0,
         rotationTarget: 0,
+        rotationFrames: 0,
         airFrame: 0,
         isGameOver: false,
+        onPlatform: false,
+        platform: null,
         score: 0,
       };
 
@@ -399,13 +438,16 @@
       const obstacleSpeed = 480;
       const obstaclePadding = 24;
       const obstacles = [];
+      const obstacleTypes = ["spike", "cube"];
 
       let lastFrameTime = 0;
       let obstacleTimer = 0;
 
       const spawnObstacle = () => {
         const obstacle = document.createElement("div");
-        obstacle.className = "spike";
+        const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+        obstacle.className = type;
+        obstacle.dataset.type = type;
         const startX = game.clientWidth + obstaclePadding;
         obstacle.dataset.x = startX.toString();
         obstacle.style.transform = `translateX(${startX}px)`;
@@ -432,8 +474,11 @@
         state.rotation = 0;
         state.rotationStart = 0;
         state.rotationTarget = 0;
+        state.rotationFrames = totalAirFrames;
         state.airFrame = 0;
         state.isGameOver = false;
+        state.onPlatform = false;
+        state.platform = null;
         state.score = 0;
         obstacleTimer = 0;
         obstacles.splice(0).forEach((obstacle) => obstacle.remove());
@@ -452,6 +497,7 @@
         state.velocity = 0;
         state.rotationStart = state.rotation;
         state.rotationTarget = state.rotation;
+        state.rotationFrames = totalAirFrames;
         gameMessage.classList.add("is-visible");
         game.classList.add("is-paused");
       };
@@ -467,6 +513,15 @@
         );
       };
 
+      const calculateFallFrames = (height) => {
+        const gravityMagnitude = Math.abs(gravity);
+        if (height <= 0) {
+          return 1;
+        }
+        const frames = Math.ceil((Math.sqrt(1 + (8 * height) / gravityMagnitude) - 1) / 2);
+        return Math.max(frames, 1);
+      };
+
       const update = (time) => {
         if (!lastFrameTime) {
           lastFrameTime = time;
@@ -478,8 +533,8 @@
           state.velocity += gravity;
           state.y += state.velocity;
           state.airFrame += 1;
-          const progress = Math.min(state.airFrame / totalAirFrames, 1);
-          state.rotation = state.rotationStart + 90 * progress;
+          const progress = Math.min(state.airFrame / state.rotationFrames, 1);
+          state.rotation = state.rotationStart + (state.rotationTarget - state.rotationStart) * progress;
 
           if (state.y <= 0) {
             state.y = 0;
@@ -487,13 +542,16 @@
             state.isJumping = false;
             state.rotation = state.rotationTarget % 360;
             state.airFrame = 0;
+            state.rotationFrames = totalAirFrames;
+            state.onPlatform = false;
+            state.platform = null;
             if (state.isHolding) {
               jump();
             }
           }
         }
 
-        cube.style.transform = `translateY(${-state.y}px) rotate(${state.rotation}deg)`;
+        square.style.transform = `translateY(${-state.y}px) rotate(${state.rotation}deg)`;
         if (!state.isGameOver) {
           obstacleTimer += delta * 1000;
           if (obstacleTimer >= obstacleIntervalMs) {
@@ -501,7 +559,8 @@
             spawnObstacle();
           }
 
-          const cubeRect = cube.getBoundingClientRect();
+          const squareRect = square.getBoundingClientRect();
+          let platformStillUnder = false;
           for (let i = obstacles.length - 1; i >= 0; i -= 1) {
             const obstacle = obstacles[i];
             const currentX = Number(obstacle.dataset.x || 0);
@@ -516,17 +575,59 @@
             }
 
             const obstacleRect = obstacle.getBoundingClientRect();
-            if (checkCollision(cubeRect, obstacleRect)) {
+            if (obstacle.dataset.type === "cube") {
+              const landingTolerance = Math.max(6, squareRect.height * 0.12);
+              const isLanding =
+                state.velocity <= 0 &&
+                squareRect.bottom <= obstacleRect.top + landingTolerance &&
+                checkCollision(squareRect, obstacleRect);
+
+              if (isLanding) {
+                state.y = obstacleRect.height;
+                state.velocity = 0;
+                state.isJumping = false;
+                state.airFrame = 0;
+                state.rotationTarget = state.rotation;
+                state.rotationStart = state.rotation;
+                state.rotationFrames = totalAirFrames;
+                state.onPlatform = true;
+                state.platform = obstacle;
+              } else if (checkCollision(squareRect, obstacleRect)) {
+                if (!state.onPlatform) {
+                  triggerGameOver();
+                }
+              }
+            } else if (checkCollision(squareRect, obstacleRect)) {
               triggerGameOver();
             }
 
-            if (!state.isGameOver && !obstacle.dataset.scored && obstacleRect.right < cubeRect.left) {
+            if (state.onPlatform && state.platform === obstacle) {
+              const overlapLeft = squareRect.right - obstacleRect.left;
+              const overlapRight = obstacleRect.right - squareRect.left;
+              if (overlapLeft > 4 && overlapRight > 4) {
+                platformStillUnder = true;
+                state.y = obstacleRect.height;
+              }
+            }
+
+            if (!state.isGameOver && !obstacle.dataset.scored && obstacleRect.right < squareRect.left) {
               if (state.y > 0) {
                 state.score += 1;
                 updateScore();
               }
               obstacle.dataset.scored = "true";
             }
+          }
+
+          if (state.onPlatform && !platformStillUnder) {
+            state.onPlatform = false;
+            state.platform = null;
+            state.isJumping = true;
+            state.velocity = 0;
+            state.airFrame = 0;
+            state.rotationStart = state.rotation;
+            state.rotationTarget = state.rotation + 90;
+            state.rotationFrames = calculateFallFrames(state.y);
           }
         }
 
@@ -540,6 +641,9 @@
           state.airFrame = 0;
           state.rotationStart = state.rotation;
           state.rotationTarget = state.rotation + 90;
+          state.rotationFrames = totalAirFrames;
+          state.onPlatform = false;
+          state.platform = null;
         }
       };
 
@@ -598,6 +702,12 @@
 
       window.addEventListener("keydown", handleSpaceDown);
       window.addEventListener("keyup", handleSpaceUp);
+      retryButton.addEventListener("click", () => {
+        if (!state.isGameOver) {
+          return;
+        }
+        resetGame();
+      });
 
       requestAnimationFrame(update);
     </script>
