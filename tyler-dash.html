@@ -428,6 +428,7 @@
         isGameOver: false,
         onPlatform: false,
         platform: null,
+        fallingFrom: null,
         score: 0,
       };
 
@@ -479,6 +480,7 @@
         state.isGameOver = false;
         state.onPlatform = false;
         state.platform = null;
+        state.fallingFrom = null;
         state.score = 0;
         obstacleTimer = 0;
         obstacles.splice(0).forEach((obstacle) => obstacle.remove());
@@ -545,6 +547,7 @@
             state.rotationFrames = totalAirFrames;
             state.onPlatform = false;
             state.platform = null;
+            state.fallingFrom = null;
             if (state.isHolding) {
               jump();
             }
@@ -575,7 +578,17 @@
             }
 
             const obstacleRect = obstacle.getBoundingClientRect();
+            if (!state.isGameOver && !obstacle.dataset.scored && obstacleRect.right < squareRect.left) {
+              if (state.y > 0) {
+                state.score += 1;
+                updateScore();
+              }
+              obstacle.dataset.scored = "true";
+            }
             if (obstacle.dataset.type === "cube") {
+              if (state.fallingFrom === obstacle) {
+                continue;
+              }
               const landingTolerance = Math.max(6, squareRect.height * 0.12);
               const isLanding =
                 state.velocity <= 0 &&
@@ -592,6 +605,7 @@
                 state.rotationFrames = totalAirFrames;
                 state.onPlatform = true;
                 state.platform = obstacle;
+                state.fallingFrom = null;
               } else if (checkCollision(squareRect, obstacleRect)) {
                 if (!state.onPlatform) {
                   triggerGameOver();
@@ -610,17 +624,11 @@
               }
             }
 
-            if (!state.isGameOver && !obstacle.dataset.scored && obstacleRect.right < squareRect.left) {
-              if (state.y > 0) {
-                state.score += 1;
-                updateScore();
-              }
-              obstacle.dataset.scored = "true";
-            }
           }
 
           if (state.onPlatform && !platformStillUnder) {
             state.onPlatform = false;
+            state.fallingFrom = state.platform;
             state.platform = null;
             state.isJumping = true;
             state.velocity = 0;
@@ -644,6 +652,7 @@
           state.rotationFrames = totalAirFrames;
           state.onPlatform = false;
           state.platform = null;
+          state.fallingFrom = null;
         }
       };
 
