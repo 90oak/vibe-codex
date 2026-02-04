@@ -590,10 +590,15 @@
                 continue;
               }
               const landingTolerance = Math.max(6, squareRect.height * 0.12);
+              const edgeBuffer = Math.max(6, squareRect.width * 0.18);
+              const isOverSafeSurface =
+                squareRect.left >= obstacleRect.left + edgeBuffer &&
+                squareRect.right <= obstacleRect.right - edgeBuffer;
               const isLanding =
                 state.velocity <= 0 &&
                 squareRect.bottom <= obstacleRect.top + landingTolerance &&
-                checkCollision(squareRect, obstacleRect);
+                checkCollision(squareRect, obstacleRect) &&
+                isOverSafeSurface;
 
               if (isLanding) {
                 state.y = obstacleRect.height;
@@ -607,7 +612,7 @@
                 state.platform = obstacle;
                 state.fallingFrom = null;
               } else if (checkCollision(squareRect, obstacleRect)) {
-                if (!state.onPlatform) {
+                if (!state.onPlatform || state.platform !== obstacle) {
                   triggerGameOver();
                 }
               }
