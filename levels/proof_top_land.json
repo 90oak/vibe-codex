@@ -1,0 +1,13 @@
+{
+  "name": "proof_top_land",
+  "obstacles": [
+    {
+      "type": "cube",
+      "time": 0.0
+    }
+  ],
+  "replay": {
+    "jumpTime": 1.45,
+    "survivalSeconds": 2
+  }
+}
