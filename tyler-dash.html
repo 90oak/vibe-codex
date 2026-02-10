@@ -170,6 +170,46 @@
         align-items: center;
         justify-content: flex-start;
         padding-left: clamp(24px, 6vw, 80px);
+        z-index: 2;
+      }
+
+      .grass-field {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: var(--floor-top);
+        height: clamp(26px, 4.6vw, 38px);
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      .grass-blade {
+        position: absolute;
+        bottom: 0;
+        width: 12px;
+        height: 34px;
+        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        transform-origin: 50% 100%;
+        filter: drop-shadow(0 6px 5px rgba(24, 99, 44, 0.3));
+        will-change: transform;
+      }
+
+      .grass-blade--faded {
+        height: 26px;
+        width: 10px;
+        opacity: 0.88;
+        background: linear-gradient(180deg, #8ac08e 0%, #5f9f67 100%);
+      }
+
+      .grass-blade--bright {
+        height: 36px;
+        width: 12px;
+        background: linear-gradient(180deg, #8fff7a 0%, #4ecb4e 55%, #26912d 100%);
+      }
+
+      .grass-blade.is-swaying {
+        animation: grass-sway-back 0.9s cubic-bezier(0.35, 0.12, 0.2, 1);
       }
 
       .square {
@@ -365,6 +405,18 @@
         }
       }
 
+      @keyframes grass-sway-back {
+        0% {
+          transform: rotate(0deg) translateY(0);
+        }
+        40% {
+          transform: rotate(-22deg) translateY(1px);
+        }
+        100% {
+          transform: rotate(0deg) translateY(0);
+        }
+      }
+
       @media (max-width: 600px) {
         .game-shell {
           border-radius: 0;
@@ -398,6 +450,7 @@
       <div class="lane">
         <div class="square" id="square"></div>
       </div>
+      <div class="grass-field" id="grassField" aria-hidden="true"></div>
       <div class="game-message" id="gameMessage">
         <div>Game Over</div>
         <button class="retry-button" id="retryButton" type="button">Retry</button>
@@ -414,6 +467,7 @@
       const gameMessage = document.getElementById("gameMessage");
       const scoreValue = document.getElementById("scoreValue");
       const retryButton = document.getElementById("retryButton");
+      const grassField = document.getElementById("grassField");
 
       const state = {
         y: 0,
@@ -441,9 +495,20 @@
       const obstaclePadding = 24;
       const obstacles = [];
       const obstacleTypes = ["spike", "cube"];
+      const grassBlades = [];
+      const grassSpawnPadding = 20;
+      const grassSpeed = obstacleSpeed * 0.72;
+      const grassSpawnIntervalMs = 320;
+      const grassSwayIntervalMs = 2400;
+      const squareBackEdgeX = () => {
+        const squareRect = square.getBoundingClientRect();
+        return squareRect.left + squareRect.width * 0.5;
+      };
 
       let lastFrameTime = 0;
       let obstacleTimer = 0;
+      let grassSpawnTimer = 0;
+      let grassSwayTimer = 0;
 
       const spawnObstacle = () => {
         const obstacle = document.createElement("div");
@@ -485,10 +550,44 @@
         state.fallingFrom = null;
         state.score = 0;
         obstacleTimer = 0;
+        grassSpawnTimer = 0;
+        grassSwayTimer = 0;
         obstacles.splice(0).forEach((obstacle) => obstacle.remove());
+        grassBlades.splice(0).forEach((blade) => blade.element.remove());
         gameMessage.classList.remove("is-visible");
         game.classList.remove("is-paused");
         updateScore();
+      };
+
+      const spawnGrassBlade = () => {
+        if (!grassField) {
+          return;
+        }
+        const blade = document.createElement("div");
+        const isFaded = Math.random() < 0.38;
+        blade.className = `grass-blade ${isFaded ? "grass-blade--faded" : "grass-blade--bright"}`;
+        const startX = game.clientWidth + grassSpawnPadding + Math.random() * 70;
+        blade.style.transform = "translateX(0px)";
+        blade.style.left = `${startX}px`;
+        grassField.appendChild(blade);
+        grassBlades.push({ element: blade, x: startX, hasPassedSquare: false, isFaded });
+      };
+
+      const swayPassedGrass = () => {
+        const passed = grassBlades.filter((blade) => blade.hasPassedSquare);
+        if (!passed.length) {
+          return;
+        }
+        const swayCount = Math.min(passed.length, Math.random() < 0.5 ? 2 : 3);
+        for (let i = passed.length - 1; i > 0; i -= 1) {
+          const swapIndex = Math.floor(Math.random() * (i + 1));
+          [passed[i], passed[swapIndex]] = [passed[swapIndex], passed[i]];
+        }
+        passed.slice(0, swayCount).forEach((blade) => {
+          blade.element.classList.remove("is-swaying");
+          void blade.element.offsetWidth;
+          blade.element.classList.add("is-swaying");
+        });
       };
 
       const triggerGameOver = () => {
@@ -577,6 +676,36 @@
         square.style.transform = `translateY(${-state.y}px) rotate(${state.rotation}deg)`;
         if (!state.isGameOver) {
           obstacleTimer += delta * 1000;
+          grassSpawnTimer += delta * 1000;
+          grassSwayTimer += delta * 1000;
+
+          if (grassSpawnTimer >= grassSpawnIntervalMs) {
+            grassSpawnTimer = 0;
+            spawnGrassBlade();
+          }
+
+          const squarePassX = squareBackEdgeX();
+          for (let i = grassBlades.length - 1; i >= 0; i -= 1) {
+            const blade = grassBlades[i];
+            blade.x -= grassSpeed * delta;
+            blade.element.style.left = `${blade.x}px`;
+
+            const bladeRect = blade.element.getBoundingClientRect();
+            if (!blade.hasPassedSquare && bladeRect.right < squarePassX) {
+              blade.hasPassedSquare = true;
+            }
+
+            if (blade.x < -grassSpawnPadding * 2) {
+              blade.element.remove();
+              grassBlades.splice(i, 1);
+            }
+          }
+
+          if (grassSwayTimer >= grassSwayIntervalMs) {
+            grassSwayTimer = 0;
+            swayPassedGrass();
+          }
+
           if (obstacleTimer >= obstacleIntervalMs) {
             obstacleTimer = 0;
             spawnObstacle();
