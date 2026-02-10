@@ -33,7 +33,7 @@
         position: relative;
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
         touch-action: manipulation;
-        --floor-bottom: 70px;
+        --floor-bottom: 16px;
         --floor-height: 90px;
         --floor-top: calc(var(--floor-bottom) + var(--floor-height));
         --floor-grid: 24px;
@@ -181,7 +181,7 @@
         height: clamp(26px, 4.6vw, 38px);
         pointer-events: none;
         overflow: hidden;
-        z-index: 1;
+        z-index: 3;
       }
 
       .grass-blade {
@@ -193,6 +193,7 @@
         transform-origin: 50% 100%;
         filter: drop-shadow(0 6px 5px rgba(24, 99, 44, 0.3));
         will-change: transform;
+        opacity: 0.95;
       }
 
       .grass-blade--faded {
@@ -297,22 +298,35 @@
         height: var(--floor-height);
         background: repeating-linear-gradient(
             0deg,
-            rgba(83, 209, 255, 0.35) 0px,
-            rgba(83, 209, 255, 0.35) 1px,
+            rgba(91, 61, 32, 0.22) 0px,
+            rgba(91, 61, 32, 0.22) 1px,
             transparent 1px,
             transparent var(--floor-grid)
           ),
           repeating-linear-gradient(
             90deg,
-            rgba(83, 209, 255, 0.35) 0px,
-            rgba(83, 209, 255, 0.35) 1px,
+            rgba(52, 32, 16, 0.24) 0px,
+            rgba(52, 32, 16, 0.24) 1px,
             transparent 1px,
             transparent var(--floor-grid)
           ),
-          linear-gradient(180deg, #1f3346 0%, #0b1622 100%);
+          linear-gradient(180deg, #6f4a2a 0%, #4f341e 46%, #352214 100%);
         background-size: var(--floor-grid) var(--floor-grid), var(--floor-grid) var(--floor-grid), 100% 100%;
         background-position: 0 0, 0 0, 0 0;
         animation: floor-slide var(--floor-speed) linear infinite;
+      }
+
+      .floor::before {
+        content: "";
+        position: absolute;
+        inset: 20px 0 12px;
+        background:
+          radial-gradient(26px 6px at 12% 20%, rgba(154, 95, 104, 0.35) 0 42%, transparent 45%),
+          radial-gradient(22px 5px at 43% 54%, rgba(142, 84, 94, 0.3) 0 42%, transparent 45%),
+          radial-gradient(24px 6px at 70% 30%, rgba(162, 103, 112, 0.32) 0 42%, transparent 45%),
+          radial-gradient(20px 5px at 88% 72%, rgba(147, 90, 98, 0.28) 0 40%, transparent 45%);
+        opacity: 0.8;
+        pointer-events: none;
       }
 
       .game-shell.is-paused .floor {
@@ -324,7 +338,7 @@
         position: absolute;
         inset: -12px 0 auto;
         height: 12px;
-        background: linear-gradient(90deg, rgba(83, 209, 255, 0.65), rgba(83, 209, 255, 0));
+        background: linear-gradient(90deg, rgba(180, 124, 72, 0.68), rgba(180, 124, 72, 0));
       }
 
       .floor-shadow {
@@ -333,7 +347,7 @@
         right: 0;
         bottom: var(--floor-bottom);
         height: 20px;
-        background: radial-gradient(circle at 30% 0%, rgba(143, 240, 255, 0.6), transparent 70%);
+        background: radial-gradient(circle at 30% 0%, rgba(141, 95, 57, 0.48), transparent 70%);
         opacity: 0.5;
         filter: blur(6px);
       }
@@ -344,7 +358,7 @@
         right: 0;
         bottom: 0;
         height: 120px;
-        background: linear-gradient(180deg, rgba(9, 16, 26, 0) 0%, rgba(8, 13, 22, 0.85) 60%, rgba(5, 8, 13, 1) 100%);
+        background: linear-gradient(180deg, rgba(37, 23, 14, 0) 0%, rgba(31, 20, 12, 0.84) 62%, rgba(20, 13, 8, 1) 100%);
       }
 
       .touch-hint {
@@ -498,7 +512,7 @@
       const grassBlades = [];
       const grassSpawnPadding = 20;
       const grassSpeed = obstacleSpeed * 0.72;
-      const grassSpawnIntervalMs = 320;
+      const grassSpawnIntervalMs = 180;
       const grassSwayIntervalMs = 2400;
       const squareBackEdgeX = () => {
         const squareRect = square.getBoundingClientRect();
@@ -564,10 +578,11 @@
           return;
         }
         const blade = document.createElement("div");
-        const isFaded = Math.random() < 0.38;
+        const isFaded = Math.random() < 0.42;
         blade.className = `grass-blade ${isFaded ? "grass-blade--faded" : "grass-blade--bright"}`;
         const startX = game.clientWidth + grassSpawnPadding + Math.random() * 70;
-        blade.style.transform = "translateX(0px)";
+        const verticalOffset = Math.random() < 0.35 ? Math.random() * 8 : 0;
+        blade.style.transform = `translateY(${verticalOffset}px)`;
         blade.style.left = `${startX}px`;
         grassField.appendChild(blade);
         grassBlades.push({ element: blade, x: startX, hasPassedSquare: false, isFaded });
@@ -682,6 +697,9 @@
           if (grassSpawnTimer >= grassSpawnIntervalMs) {
             grassSpawnTimer = 0;
             spawnGrassBlade();
+            if (Math.random() < 0.55) {
+              spawnGrassBlade();
+            }
           }
 
           const squarePassX = squareBackEdgeX();
