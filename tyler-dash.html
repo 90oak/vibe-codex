@@ -384,7 +384,7 @@
     <main class="game-shell" id="game">
       <div class="hud">
         <div class="title">Tyler Dash</div>
-        <div class="subtitle">Tap to hop. Press & hold to chain jumps.</div>
+        <div class="subtitle">Tap to hop. Press & hold to chain jumps • build platform-top-landing</div>
       </div>
       <div class="scoreboard">
         <div class="score-label">Score</div>
@@ -425,6 +425,7 @@
         rotationTarget: 0,
         rotationFrames: 0,
         airFrame: 0,
+        prevY: 0,
         isGameOver: false,
         onPlatform: false,
         platform: null,
@@ -477,6 +478,7 @@
         state.rotationTarget = 0;
         state.rotationFrames = totalAirFrames;
         state.airFrame = 0;
+        state.prevY = 0;
         state.isGameOver = false;
         state.onPlatform = false;
         state.platform = null;
@@ -515,6 +517,23 @@
         );
       };
 
+      const getSquareHitbox = (yOverride = state.y) => {
+        const gameRect = game.getBoundingClientRect();
+        const squareStyle = window.getComputedStyle(square);
+        const left = gameRect.left + Number.parseFloat(squareStyle.left || "0");
+        const bottom = gameRect.bottom - Number.parseFloat(squareStyle.bottom || "0") - yOverride;
+        const width = square.offsetWidth;
+        const height = square.offsetHeight;
+        return {
+          left,
+          right: left + width,
+          top: bottom - height,
+          bottom,
+          width,
+          height,
+        };
+      };
+
       const calculateFallFrames = (height) => {
         const gravityMagnitude = Math.abs(gravity);
         if (height <= 0) {
@@ -530,6 +549,7 @@
         }
         const delta = Math.min((time - lastFrameTime) / 1000, 0.05);
         lastFrameTime = time;
+        state.prevY = state.y;
 
         if (state.isJumping) {
           state.velocity += gravity;
@@ -562,7 +582,8 @@
             spawnObstacle();
           }
 
-          const squareRect = square.getBoundingClientRect();
+          const squareRect = getSquareHitbox(state.y);
+          const prevSquareRect = getSquareHitbox(state.prevY);
           let platformStillUnder = false;
           for (let i = obstacles.length - 1; i >= 0; i -= 1) {
             const obstacle = obstacles[i];
@@ -589,18 +610,17 @@
               if (state.fallingFrom === obstacle) {
                 continue;
               }
-              const landingTolerance = Math.max(6, squareRect.height * 0.12);
-              const edgeBuffer = Math.max(6, squareRect.width * 0.18);
-              const isOverSafeSurface =
-                squareRect.left >= obstacleRect.left + edgeBuffer &&
-                squareRect.right <= obstacleRect.right - edgeBuffer;
-              const isLanding =
+              const horizontalOverlap = Math.min(squareRect.right, obstacleRect.right) - Math.max(squareRect.left, obstacleRect.left);
+              const minOverlap = Math.max(10, squareRect.width * 0.25);
+              const eps = 2;
+              const landedFromAbove =
                 state.velocity <= 0 &&
-                squareRect.bottom <= obstacleRect.top + landingTolerance &&
                 checkCollision(squareRect, obstacleRect) &&
-                isOverSafeSurface;
+                prevSquareRect.bottom <= obstacleRect.top + eps &&
+                squareRect.bottom >= obstacleRect.top - eps &&
+                horizontalOverlap >= minOverlap;
 
-              if (isLanding) {
+              if (landedFromAbove) {
                 state.y = obstacleRect.height;
                 state.velocity = 0;
                 state.isJumping = false;
@@ -611,6 +631,7 @@
                 state.onPlatform = true;
                 state.platform = obstacle;
                 state.fallingFrom = null;
+                platformStillUnder = true;
               } else if (checkCollision(squareRect, obstacleRect)) {
                 if (!state.onPlatform || state.platform !== obstacle) {
                   triggerGameOver();
