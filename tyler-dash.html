@@ -211,16 +211,18 @@
         position: absolute;
         display: grid;
         grid-auto-flow: column;
-        gap: 2px;
+        gap: 0;
         will-change: transform;
+        filter: drop-shadow(0 6px 8px rgba(54, 120, 160, 0.34));
       }
 
       .cloud-cube {
-        width: 8px;
-        height: 8px;
-        border-radius: 1px;
-        background: linear-gradient(145deg, #ffffff 0%, #f2fbff 55%, #d8ecf8 100%);
-        box-shadow: 0 1px 1px rgba(111, 165, 194, 0.4);
+        width: 10px;
+        height: 10px;
+        margin: -1px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #ffffff 0 34%, #e7f6ff 68%, #c2deef 100%);
+        box-shadow: 0 0 0 1px rgba(216, 238, 252, 0.9), 0 1px 2px rgba(88, 143, 173, 0.42);
       }
 
       .grass-field {
@@ -266,9 +268,14 @@
       .square {
         width: clamp(48px, 7vw, 72px);
         height: clamp(48px, 7vw, 72px);
-        background: linear-gradient(145deg, #8ff0ff 0%, #39b6ff 35%, #1b4bd6 100%);
-        border-radius: 10px;
-        box-shadow: 0 18px 35px rgba(34, 94, 185, 0.45);
+        background:
+          repeating-linear-gradient(0deg, #d9ae4a 0 8px, #bf9335 8px 16px),
+          repeating-linear-gradient(90deg, rgba(107, 70, 18, 0.6) 0 3px, transparent 3px 16px),
+          linear-gradient(145deg, #f6cf67 0%, #d5a94a 48%, #a87922 100%);
+        image-rendering: pixelated;
+        border-radius: 2px;
+        border: 2px solid #7d5318;
+        box-shadow: 0 16px 28px rgba(82, 54, 16, 0.5);
         position: absolute;
         left: clamp(24px, 6vw, 80px);
         bottom: var(--floor-top);
@@ -281,9 +288,14 @@
         bottom: var(--floor-top);
         width: clamp(46px, 6.8vw, 70px);
         height: clamp(46px, 6.8vw, 70px);
-        background: linear-gradient(145deg, #8b98ff 0%, #566dff 45%, #2b3fe0 100%);
-        border-radius: 2px;
-        box-shadow: 0 16px 28px rgba(61, 82, 214, 0.5);
+        background:
+          repeating-linear-gradient(0deg, #e4ba57 0 8px, #c39537 8px 16px),
+          repeating-linear-gradient(90deg, rgba(117, 79, 22, 0.58) 0 3px, transparent 3px 16px),
+          linear-gradient(145deg, #f4d37f 0%, #d7aa4d 48%, #9f7124 100%);
+        image-rendering: pixelated;
+        border: 3px solid #694313;
+        border-radius: 1px;
+        box-shadow: 0 12px 0 rgba(74, 46, 11, 0.45), 0 0 0 2px rgba(255, 234, 174, 0.5);
       }
 
       .spike {
@@ -291,9 +303,11 @@
         bottom: var(--floor-top);
         width: clamp(46px, 6.5vw, 70px);
         height: clamp(46px, 6.5vw, 70px);
-        background: linear-gradient(145deg, #ff7c8c 0%, #f7435a 45%, #c21b37 100%);
+        background: linear-gradient(145deg, #ffd869 0%, #ff9d3c 40%, #e14a12 100%);
+        border: 3px solid #702508;
+        border-bottom: none;
         clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-        filter: drop-shadow(0 10px 14px rgba(255, 86, 107, 0.45));
+        filter: drop-shadow(0 10px 12px rgba(123, 43, 11, 0.48));
       }
 
       .game-message {
@@ -633,18 +647,63 @@
       };
 
       const createCloudShape = () => {
-        const rows = 2 + Math.floor(Math.random() * 3);
-        const cols = 7 + Math.floor(Math.random() * 7);
-        const cubes = [];
+        const rows = 5 + Math.floor(Math.random() * 3);
+        const cols = 11 + Math.floor(Math.random() * 6);
+        const centerRow = (rows - 1) / 2;
+        const centerCol = (cols - 1) / 2;
+        const blobCount = 3 + Math.floor(Math.random() * 3);
+        const blobs = Array.from({ length: blobCount }, (_, index) => ({
+          row: centerRow + (Math.random() - 0.5) * (index === 0 ? 0.8 : 2.2),
+          col: centerCol + (Math.random() - 0.5) * (index === 0 ? 1.6 : 5.2),
+          radius: 1.8 + Math.random() * 1.7,
+        }));
+        const occupied = new Set();
+
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
-            const centerBias = 1 - Math.abs((col - (cols - 1) / 2) / (cols / 2));
-            if (Math.random() < 0.3 + centerBias * 0.6) {
-              cubes.push({ row, col });
+            const isInsideBlob = blobs.some((blob) => {
+              const rowDelta = row - blob.row;
+              const colDelta = (col - blob.col) * 0.92;
+              return Math.sqrt(rowDelta * rowDelta + colDelta * colDelta) <= blob.radius;
+            });
+
+            if (isInsideBlob) {
+              occupied.add(`${row},${col}`);
             }
           }
         }
-        return cubes;
+
+        const connected = new Set();
+        const start = `${Math.round(centerRow)},${Math.round(centerCol)}`;
+        if (occupied.has(start)) {
+          const stack = [start];
+          while (stack.length) {
+            const current = stack.pop();
+            if (!current || connected.has(current)) {
+              continue;
+            }
+            connected.add(current);
+            const [row, col] = current.split(",").map(Number);
+            [
+              [row - 1, col],
+              [row + 1, col],
+              [row, col - 1],
+              [row, col + 1],
+            ].forEach(([nextRow, nextCol]) => {
+              const key = `${nextRow},${nextCol}`;
+              if (occupied.has(key) && !connected.has(key)) {
+                stack.push(key);
+              }
+            });
+          }
+        }
+
+        const cloudShape = [...connected].map((cell) => {
+          const [row, col] = cell.split(",").map(Number);
+          return { row, col };
+        });
+
+        return cloudShape.length ? cloudShape : [{ row: Math.round(centerRow), col: Math.round(centerCol) }];
       };
 
       const spawnCloud = () => {
@@ -654,7 +713,7 @@
         const cloud = document.createElement("div");
         cloud.className = "cloud";
         const cubeMap = createCloudShape();
-        const cubeSize = 8;
+        const cubeSize = 10;
         const maxCol = Math.max(...cubeMap.map((cube) => cube.col), 0);
         const maxRow = Math.max(...cubeMap.map((cube) => cube.row), 0);
         cloud.style.width = `${(maxCol + 1) * (cubeSize + 2)}px`;
@@ -668,7 +727,7 @@
         });
 
         const startX = game.clientWidth + cloudSpawnPadding;
-        const y = 28 + Math.random() * 140;
+        const y = 26 + Math.random() * 136;
         cloud.style.transform = `translate(${startX}px, ${y}px)`;
         cloudLayer.appendChild(cloud);
         clouds.push({ element: cloud, x: startX, y });
