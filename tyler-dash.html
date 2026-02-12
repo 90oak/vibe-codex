@@ -38,6 +38,7 @@
         --floor-top: calc(var(--floor-bottom) + var(--floor-height));
         --floor-grid: 24px;
         --floor-speed: 0.05s;
+        --sky-horizon: calc(var(--floor-top) + 2px);
       }
 
       .game-shell,
@@ -173,6 +174,55 @@
         z-index: 2;
       }
 
+      .sky {
+        position: absolute;
+        inset: 0 0 var(--sky-horizon);
+        background:
+          linear-gradient(180deg, rgba(153, 227, 255, 0.72) 0%, rgba(129, 212, 255, 0.88) 42%, rgba(178, 232, 255, 0.95) 100%);
+        overflow: hidden;
+        z-index: 1;
+      }
+
+      .sky::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(
+            0deg,
+            rgba(227, 245, 255, 0.16) 0 2px,
+            transparent 2px 24px
+          ),
+          repeating-linear-gradient(
+            90deg,
+            rgba(227, 245, 255, 0.2) 0 2px,
+            transparent 2px 24px
+          );
+        opacity: 0.75;
+      }
+
+      .cloud-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .cloud {
+        position: absolute;
+        display: grid;
+        grid-auto-flow: column;
+        gap: 2px;
+        will-change: transform;
+      }
+
+      .cloud-cube {
+        width: 8px;
+        height: 8px;
+        border-radius: 1px;
+        background: linear-gradient(145deg, #ffffff 0%, #f2fbff 55%, #d8ecf8 100%);
+        box-shadow: 0 1px 1px rgba(111, 165, 194, 0.4);
+      }
+
       .grass-field {
         position: absolute;
         left: 0;
@@ -296,36 +346,34 @@
         right: 0;
         bottom: var(--floor-bottom);
         height: var(--floor-height);
-        background: repeating-linear-gradient(
-            0deg,
-            rgba(91, 61, 32, 0.22) 0px,
-            rgba(91, 61, 32, 0.22) 1px,
-            transparent 1px,
-            transparent var(--floor-grid)
-          ),
+        background:
           repeating-linear-gradient(
             90deg,
-            rgba(52, 32, 16, 0.24) 0px,
-            rgba(52, 32, 16, 0.24) 1px,
-            transparent 1px,
-            transparent var(--floor-grid)
+            rgba(73, 51, 30, 0.45) 0 2px,
+            transparent 2px 32px
           ),
-          linear-gradient(180deg, #6f4a2a 0%, #4f341e 46%, #352214 100%);
+          repeating-linear-gradient(
+            0deg,
+            rgba(73, 51, 30, 0.35) 0 2px,
+            transparent 2px 32px
+          ),
+          linear-gradient(180deg, #8f6438 0%, #724d2d 52%, #593a22 100%);
         background-size: var(--floor-grid) var(--floor-grid), var(--floor-grid) var(--floor-grid), 100% 100%;
         background-position: 0 0, 0 0, 0 0;
         animation: floor-slide var(--floor-speed) linear infinite;
+        border-top: 2px solid rgba(217, 165, 104, 0.9);
       }
 
       .floor::before {
         content: "";
         position: absolute;
-        inset: 20px 0 12px;
-        background:
-          radial-gradient(26px 6px at 12% 20%, rgba(154, 95, 104, 0.35) 0 42%, transparent 45%),
-          radial-gradient(22px 5px at 43% 54%, rgba(142, 84, 94, 0.3) 0 42%, transparent 45%),
-          radial-gradient(24px 6px at 70% 30%, rgba(162, 103, 112, 0.32) 0 42%, transparent 45%),
-          radial-gradient(20px 5px at 88% 72%, rgba(147, 90, 98, 0.28) 0 40%, transparent 45%);
-        opacity: 0.8;
+        inset: 14px 0 12px;
+        background: repeating-linear-gradient(
+          90deg,
+          rgba(185, 130, 72, 0.32) 0 18px,
+          rgba(101, 68, 38, 0.28) 18px 32px
+        );
+        opacity: 0.82;
         pointer-events: none;
       }
 
@@ -358,7 +406,7 @@
         right: 0;
         bottom: 0;
         height: 120px;
-        background: linear-gradient(180deg, rgba(37, 23, 14, 0) 0%, rgba(31, 20, 12, 0.84) 62%, rgba(20, 13, 8, 1) 100%);
+        background: linear-gradient(180deg, rgba(37, 23, 14, 0) 0%, rgba(58, 40, 24, 0.72) 62%, rgba(45, 30, 18, 1) 100%);
       }
 
       .touch-hint {
@@ -461,6 +509,9 @@
           <span class="score-sparkle sparkle-three" aria-hidden="true"></span>
         </div>
       </div>
+      <div class="sky" aria-hidden="true">
+        <div class="cloud-layer" id="cloudLayer"></div>
+      </div>
       <div class="lane">
         <div class="square" id="square"></div>
       </div>
@@ -482,6 +533,7 @@
       const scoreValue = document.getElementById("scoreValue");
       const retryButton = document.getElementById("retryButton");
       const grassField = document.getElementById("grassField");
+      const cloudLayer = document.getElementById("cloudLayer");
 
       const state = {
         y: 0,
@@ -514,6 +566,10 @@
       const grassSpeed = obstacleSpeed * 0.72;
       const grassSpawnIntervalMs = 180;
       const grassSwayIntervalMs = 2400;
+      const clouds = [];
+      const cloudSpeed = obstacleSpeed * 0.34;
+      const cloudSpawnIntervalMs = 1650;
+      const cloudSpawnPadding = 120;
       const squareBackEdgeX = () => {
         const squareRect = square.getBoundingClientRect();
         return squareRect.left + squareRect.width * 0.5;
@@ -523,6 +579,7 @@
       let obstacleTimer = 0;
       let grassSpawnTimer = 0;
       let grassSwayTimer = 0;
+      let cloudSpawnTimer = 0;
 
       const spawnObstacle = () => {
         const obstacle = document.createElement("div");
@@ -566,11 +623,55 @@
         obstacleTimer = 0;
         grassSpawnTimer = 0;
         grassSwayTimer = 0;
+        cloudSpawnTimer = 0;
         obstacles.splice(0).forEach((obstacle) => obstacle.remove());
         grassBlades.splice(0).forEach((blade) => blade.element.remove());
+        clouds.splice(0).forEach((cloud) => cloud.element.remove());
         gameMessage.classList.remove("is-visible");
         game.classList.remove("is-paused");
         updateScore();
+      };
+
+      const createCloudShape = () => {
+        const rows = 2 + Math.floor(Math.random() * 3);
+        const cols = 7 + Math.floor(Math.random() * 7);
+        const cubes = [];
+        for (let row = 0; row < rows; row += 1) {
+          for (let col = 0; col < cols; col += 1) {
+            const centerBias = 1 - Math.abs((col - (cols - 1) / 2) / (cols / 2));
+            if (Math.random() < 0.3 + centerBias * 0.6) {
+              cubes.push({ row, col });
+            }
+          }
+        }
+        return cubes;
+      };
+
+      const spawnCloud = () => {
+        if (!cloudLayer) {
+          return;
+        }
+        const cloud = document.createElement("div");
+        cloud.className = "cloud";
+        const cubeMap = createCloudShape();
+        const cubeSize = 8;
+        const maxCol = Math.max(...cubeMap.map((cube) => cube.col), 0);
+        const maxRow = Math.max(...cubeMap.map((cube) => cube.row), 0);
+        cloud.style.width = `${(maxCol + 1) * (cubeSize + 2)}px`;
+        cloud.style.height = `${(maxRow + 1) * (cubeSize + 2)}px`;
+        cubeMap.forEach((cube) => {
+          const cubeElement = document.createElement("span");
+          cubeElement.className = "cloud-cube";
+          cubeElement.style.gridColumn = `${cube.col + 1}`;
+          cubeElement.style.gridRow = `${cube.row + 1}`;
+          cloud.appendChild(cubeElement);
+        });
+
+        const startX = game.clientWidth + cloudSpawnPadding;
+        const y = 28 + Math.random() * 140;
+        cloud.style.transform = `translate(${startX}px, ${y}px)`;
+        cloudLayer.appendChild(cloud);
+        clouds.push({ element: cloud, x: startX, y });
       };
 
       const spawnGrassBlade = () => {
@@ -693,6 +794,7 @@
           obstacleTimer += delta * 1000;
           grassSpawnTimer += delta * 1000;
           grassSwayTimer += delta * 1000;
+          cloudSpawnTimer += delta * 1000;
 
           if (grassSpawnTimer >= grassSpawnIntervalMs) {
             grassSpawnTimer = 0;
@@ -722,6 +824,22 @@
           if (grassSwayTimer >= grassSwayIntervalMs) {
             grassSwayTimer = 0;
             swayPassedGrass();
+          }
+
+          if (cloudSpawnTimer >= cloudSpawnIntervalMs) {
+            cloudSpawnTimer = 0;
+            spawnCloud();
+          }
+
+          for (let i = clouds.length - 1; i >= 0; i -= 1) {
+            const cloud = clouds[i];
+            cloud.x -= cloudSpeed * delta;
+            cloud.element.style.transform = `translate(${cloud.x}px, ${cloud.y}px)`;
+
+            if (cloud.x < -cloudSpawnPadding * 2.5) {
+              cloud.element.remove();
+              clouds.splice(i, 1);
+            }
           }
 
           if (obstacleTimer >= obstacleIntervalMs) {
