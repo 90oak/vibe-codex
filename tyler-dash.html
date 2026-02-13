@@ -289,25 +289,57 @@
         width: clamp(46px, 6.8vw, 70px);
         height: clamp(46px, 6.8vw, 70px);
         background:
-          repeating-linear-gradient(0deg, #e4ba57 0 8px, #c39537 8px 16px),
-          repeating-linear-gradient(90deg, rgba(117, 79, 22, 0.58) 0 3px, transparent 3px 16px),
-          linear-gradient(145deg, #f4d37f 0%, #d7aa4d 48%, #9f7124 100%);
+          repeating-linear-gradient(0deg, #4f637f 0 8px, #354a62 8px 16px),
+          repeating-linear-gradient(90deg, #1f2f44 0 3px, #415776 3px 16px),
+          linear-gradient(145deg, #8198bb 0%, #4e6788 48%, #2c3f56 100%);
         image-rendering: pixelated;
-        border: 3px solid #694313;
+        border: 3px solid #1a2738;
         border-radius: 1px;
-        box-shadow: 0 12px 0 rgba(74, 46, 11, 0.45), 0 0 0 2px rgba(255, 234, 174, 0.5);
+        box-shadow: 0 12px 0 #1a2433, 0 0 0 2px #9ab2d6;
       }
 
       .spike {
         position: absolute;
         bottom: var(--floor-top);
         width: clamp(46px, 6.5vw, 70px);
-        height: clamp(46px, 6.5vw, 70px);
-        background: linear-gradient(145deg, #ffd869 0%, #ff9d3c 40%, #e14a12 100%);
-        border: 3px solid #702508;
-        border-bottom: none;
-        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-        filter: drop-shadow(0 10px 12px rgba(123, 43, 11, 0.48));
+        height: clamp(34px, 4.8vw, 48px);
+        background:
+          repeating-linear-gradient(105deg, #c79c3d 0 6px, #deb455 6px 12px),
+          linear-gradient(180deg, #e8c968 0%, #cca147 62%, #a37e30 100%);
+        border: 3px solid #7f5b23;
+        border-radius: 7px 7px 4px 4px;
+        box-shadow: 0 10px 12px #5e431b;
+        overflow: visible;
+      }
+
+      .spike::before {
+        content: "";
+        position: absolute;
+        width: 88%;
+        height: 130%;
+        left: 6%;
+        bottom: 44%;
+        transform: rotate(-26deg);
+        transform-origin: 20% 100%;
+        background:
+          linear-gradient(90deg, #c8d4e4 0 9%, transparent 9% 22%, #c8d4e4 22% 31%, transparent 31% 44%, #c8d4e4 44% 53%, transparent 53%),
+          linear-gradient(180deg, #ced9e8 0 22%, #8f9cb0 22% 34%, transparent 34%),
+          linear-gradient(180deg, #86653a 0%, #6a4f2d 100%);
+        background-size: 62% 42%, 62% 36%, 16% 100%;
+        background-position: 8% 0, 8% 16%, 58% 0;
+        background-repeat: no-repeat;
+      }
+
+      .spike::after {
+        content: "";
+        position: absolute;
+        inset: -10px -8px auto;
+        height: 18px;
+        background:
+          linear-gradient(62deg, transparent 0 35%, #f2de95 35% 48%, transparent 48% 100%),
+          linear-gradient(124deg, transparent 0 44%, #f4df90 44% 56%, transparent 56% 100%),
+          linear-gradient(88deg, transparent 0 40%, #edd47e 40% 52%, transparent 52% 100%);
+        pointer-events: none;
       }
 
       .game-message {
