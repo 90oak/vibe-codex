@@ -269,18 +269,53 @@
         width: clamp(48px, 7vw, 72px);
         height: clamp(48px, 7vw, 72px);
         background:
-          repeating-linear-gradient(0deg, #f3cc62 0 7px, #ce9d34 7px 14px),
-          repeating-linear-gradient(90deg, rgba(94, 60, 13, 0.92) 0 3px, rgba(152, 108, 32, 0.55) 3px 14px),
-          linear-gradient(145deg, #ffe28d 0%, #dfad43 52%, #8e641a 100%);
+          repeating-linear-gradient(0deg, rgba(255, 226, 143, 0.95) 0 6px, rgba(246, 204, 102, 0.95) 6px 12px),
+          repeating-linear-gradient(90deg, rgba(205, 155, 68, 0.35) 0 2px, rgba(255, 233, 170, 0.28) 2px 10px),
+          linear-gradient(145deg, #fff1bf 0%, #f4c96f 54%, #c48a32 100%);
         image-rendering: pixelated;
         border-radius: 2px;
-        border: 3px solid #4d320b;
-        box-shadow: 0 14px 0 #5f3e11, 0 0 0 2px #f2c55c, 0 18px 30px rgba(58, 36, 10, 0.56);
+        border: 3px solid #7a5320;
+        box-shadow: 0 14px 0 #8f6328, 0 0 0 2px #ffe09d, 0 18px 30px rgba(78, 53, 21, 0.42);
         position: absolute;
         left: clamp(24px, 6vw, 80px);
         bottom: var(--floor-top);
         transform: translateY(0);
         transform-origin: center;
+        overflow: hidden;
+      }
+
+      .square-face {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .square-eye {
+        position: absolute;
+        width: clamp(4px, 0.8vw, 7px);
+        height: clamp(4px, 0.8vw, 7px);
+        background: #4b2d0d;
+        border: 1px solid rgba(255, 240, 207, 0.42);
+      }
+
+      .square-eye--left {
+        left: 30%;
+        top: 42%;
+      }
+
+      .square-eye--right {
+        left: 56%;
+        top: 33%;
+      }
+
+      .square-mouth {
+        position: absolute;
+        left: 34%;
+        top: 58%;
+        width: 34%;
+        height: clamp(5px, 1vw, 8px);
+        background: #77421b;
+        border: 1px solid rgba(255, 235, 184, 0.45);
       }
 
       .cube {
@@ -559,7 +594,13 @@
         <div class="cloud-layer" id="cloudLayer"></div>
       </div>
       <div class="lane">
-        <div class="square" id="square"></div>
+        <div class="square" id="square">
+          <div class="square-face" aria-hidden="true">
+            <span class="square-eye square-eye--left"></span>
+            <span class="square-eye square-eye--right"></span>
+            <span class="square-mouth"></span>
+          </div>
+        </div>
       </div>
       <div class="grass-field" id="grassField" aria-hidden="true"></div>
       <div class="game-message" id="gameMessage">
