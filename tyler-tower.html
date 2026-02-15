@@ -1,0 +1,2407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monkey Track Defense</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --good: #22c55e;
+      --bad: #ef4444;
+      --accent: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: radial-gradient(circle at 20% 10%, #1e293b, var(--bg) 60%);
+      color: var(--text);
+      font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    #app {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #hud {
+      height: 52px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(6px);
+      z-index: 5;
+    }
+
+    #hud .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    #hud .hint {
+      color: var(--muted);
+      margin-left: auto;
+      font-size: 13px;
+    }
+
+    #gameShell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    #playArea {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      background: linear-gradient(165deg, #3f5a26 0%, #2e4922 60%, #263e1f 100%);
+    }
+
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    #sideBar {
+      width: 20%;
+      min-width: 220px;
+      max-width: 360px;
+      padding: 12px;
+      background: linear-gradient(180deg, #0b1220, #111827 80%);
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+      overflow: auto;
+    }
+
+    #sideBar h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: 0.4px;
+    }
+
+    .monkeyCard {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      margin-bottom: 10px;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    .monkeyCard:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .monkeyCard.selected {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.16);
+    }
+
+    .monkeyCard.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .monkeyCard .name {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .monkeyCard .meta {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .monkeyCard .desc {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .smallBtn {
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    .selectedSummary {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+
+    .upgradeHint {
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #a5b4fc;
+    }
+
+    .upgradeRowWrap {
+      margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .upgradeRowHead {
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .upgradeRowGrid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .upgradeTile {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      padding: 4px 3px 5px;
+      text-align: center;
+      cursor: pointer;
+      min-height: 76px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .upgradeTile .upgradeIcon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(15, 23, 42, 0.92);
+      display: grid;
+      place-items: center;
+      margin-bottom: 1px;
+    }
+
+    .upgradeTile .upgradeIcon svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .upgradeTier {
+      font-size: 10px;
+      color: #bfdbfe;
+      line-height: 1.1;
+    }
+
+    .upgradePrice {
+      font-size: 10px;
+      color: #cbd5e1;
+      line-height: 1.1;
+    }
+
+    .upgradeMiniName {
+      font-size: 9px;
+      line-height: 1.05;
+      color: #94a3b8;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .upgradeTile.next {
+      border-color: rgba(251, 191, 36, 0.8);
+      background: rgba(251, 191, 36, 0.12);
+    }
+
+    .upgradeTile.purchased {
+      border-color: rgba(34, 197, 94, 0.8);
+      background: rgba(34, 197, 94, 0.14);
+    }
+
+    .upgradeTile.locked {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 20;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .panel {
+      width: min(760px, 96vw);
+      max-height: 92vh;
+      overflow: auto;
+      background: linear-gradient(180deg, #0f172a, #111827);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .panel h1, .panel h2 {
+      margin-top: 0;
+    }
+
+    .tracks {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 10px 0 14px;
+    }
+
+    .trackBtn {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 14px;
+      background: #1f2937;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .trackBtn.selected {
+      border-color: #f59e0b;
+      background: #3a2a0a;
+    }
+
+    .btnRow {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    button.primary {
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #fbbf24, #f59e0b);
+      color: #1f2937;
+      font-weight: 700;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    #intermissionPopup {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      padding: 8px;
+      border-radius: 8px;
+      width: 170px;
+      background: rgba(2, 6, 23, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      z-index: 9;
+      font-size: 12px;
+    }
+
+    #intermissionPopup.hidden {
+      display: none;
+    }
+
+    #intermissionPopup .buttons {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    #intermissionPopup button {
+      flex: 1;
+      padding: 5px 6px;
+      font-size: 11px;
+      border-radius: 6px;
+    }
+
+    #waveBonusPopup {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(34, 197, 94, 0.75);
+      background: rgba(22, 101, 52, 0.92);
+      color: #dcfce7;
+      font-weight: 700;
+      z-index: 10;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      white-space: nowrap;
+    }
+
+    #waveBonusPopup.hidden {
+      display: none;
+    }
+
+    .msg {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    #speedBtn {
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font-size: 13px;
+      padding: 6px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 960px) {
+      #hud .hint {
+        display: none;
+      }
+
+      #sideBar {
+        min-width: 165px;
+        width: 22%;
+        padding: 8px;
+      }
+
+      .tracks {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div class="pill">Cash: $<span id="cashLabel">500</span></div>
+      <div class="pill">Score: <span id="scoreLabel">0</span></div>
+      <div class="pill">Lives: <span id="livesLabel">20</span></div>
+      <div class="pill">Wave: <span id="waveLabel">0</span></div>
+      <div class="pill" id="phaseLabel">Phase: Waiting</div>
+      <button id="speedBtn" type="button" aria-label="Change game speed">▶ 1x</button>
+      <div class="hint">Controls: Click monkey card -> move mouse/finger -> double-click / double-tap / double-Enter to place. Tap/click a placed monkey to open upgrades. Keys: 1-3 choose monkey, arrows/WASD move cursor, Esc cancel.</div>
+    </div>
+
+    <div id="gameShell">
+      <div id="playArea">
+        <canvas id="gameCanvas"></canvas>
+        <div id="intermissionPopup" class="hidden">
+          <div>Skip the rest of intermission?</div>
+          <div class="buttons">
+            <button id="skipBreakBtn" class="primary">Skip</button>
+            <button id="keepBreakBtn" class="secondary">Wait</button>
+          </div>
+        </div>
+        <div id="waveBonusPopup" class="hidden">Wave bonus: $0</div>
+      </div>
+      <aside id="sideBar">
+        <h2 id="sideTitle">Monkeys</h2>
+        <div id="sideContent"></div>
+        <div class="msg" id="msgLine"></div>
+      </aside>
+    </div>
+
+    <div id="startScreen" class="overlay">
+      <div class="panel">
+        <h1>Monkey Track Defense</h1>
+        <p>Pick a track, place monkeys, and pop balloon waves before they reach the end.</p>
+        <p>Starting cash is <strong>$500</strong>. Red balloons need <strong>2 hits</strong> and award <strong>$3</strong> when popped. Green balloons have an extra outer health layer and turn into red after one Dart Monkey hit.</p>
+        <h2>Select Track</h2>
+        <div class="tracks" id="trackList"></div>
+        <div class="btnRow">
+          <button id="startBtn" class="primary">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="gameOverScreen" class="overlay hidden">
+      <div class="panel">
+        <h2>Game Over</h2>
+        <p id="gameOverText"></p>
+        <div class="btnRow">
+          <button id="restartBtn" class="primary">Play Again</button>
+          <button id="backToStartBtn" class="secondary">Back To Start</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const playArea = document.getElementById("playArea");
+    const sideTitle = document.getElementById("sideTitle");
+    const sideContent = document.getElementById("sideContent");
+    const msgLine = document.getElementById("msgLine");
+
+    const cashLabel = document.getElementById("cashLabel");
+    const scoreLabel = document.getElementById("scoreLabel");
+    const livesLabel = document.getElementById("livesLabel");
+    const waveLabel = document.getElementById("waveLabel");
+    const phaseLabel = document.getElementById("phaseLabel");
+    const speedBtn = document.getElementById("speedBtn");
+
+    const startScreen = document.getElementById("startScreen");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const gameOverText = document.getElementById("gameOverText");
+    const trackList = document.getElementById("trackList");
+    const intermissionPopup = document.getElementById("intermissionPopup");
+    const waveBonusPopup = document.getElementById("waveBonusPopup");
+
+    const monkeyTypes = [
+      {
+        id: "dart",
+        name: "Dart Monkey",
+        cost: 200,
+        range: 155,
+        fireRate: 0.5,
+        damage: 1,
+        projectileSpeed: 430,
+        color: "#8b5a2b",
+        dartColor: "#fbbf24",
+        description: "Fast starter. Throws a dart every 0.5s."
+      },
+      {
+        id: "sniper",
+        name: "Sniper Monkey",
+        cost: 900,
+        range: 9999,
+        fireRate: 1.25,
+        damage: 2,
+        projectileSpeed: 600,
+        color: "#475569",
+        dartColor: "#e2e8f0",
+        description: "Global range, slower high-damage shots."
+      },
+      {
+        id: "glue",
+        name: "Glue Monkey",
+        cost: 650,
+        range: 140,
+        fireRate: 1.1,
+        damage: 0,
+        projectileSpeed: 340,
+        color: "#16a34a",
+        dartColor: "#86efac",
+        description: "Applies glue that slows balloons."
+      }
+    ];
+
+    const monkeyUpgradeRows = {
+      dart: {
+        rowA: [
+          { name: "Pointed Tip", cost: 130, icon: "dart", effects: { damage: 1 } },
+          { name: "Wrist Snap", cost: 180, icon: "speed", effects: { fireRateMul: 0.88 } },
+          { name: "Razor Fan", cost: 260, icon: "power", effects: { damage: 1 } },
+          { name: "Rapid Grip", cost: 420, icon: "speed", effects: { fireRateMul: 0.8 } },
+          { name: "Storm Darts", cost: 720, icon: "dart", effects: { damage: 2, range: 20 } }
+        ],
+        rowB: [
+          { name: "Long Reach", cost: 110, icon: "range", effects: { range: 30 } },
+          { name: "Sharp Sight", cost: 160, icon: "vision", effects: { range: 35 } },
+          { name: "Focused Aim", cost: 250, icon: "power", effects: { damage: 1, range: 20 } },
+          { name: "Pierce Toss", cost: 400, icon: "dart", effects: { damage: 1 } },
+          { name: "Balloon Hunter", cost: 700, icon: "target", effects: { damage: 2, fireRateMul: 0.9 } }
+        ],
+        rowC: [
+          { name: "Light Grip", cost: 120, icon: "speed", effects: { fireRateMul: 0.92 } },
+          { name: "Quick Sight", cost: 170, icon: "vision", effects: { range: 20 } },
+          { name: "Power Palm", cost: 250, icon: "power", effects: { damage: 1 } },
+          { name: "Ranged Stance", cost: 360, icon: "range", effects: { range: 25 } },
+          { name: "Swift Hunter", cost: 640, icon: "target", effects: { damage: 1, fireRateMul: 0.82 } }
+        ]
+      },
+      sniper: {
+        rowA: [
+          { name: "High Caliber", cost: 220, icon: "power", effects: { damage: 1 } },
+          { name: "Steady Scope", cost: 300, icon: "range", effects: { range: 300 } },
+          { name: "Armor Shot", cost: 460, icon: "power", effects: { damage: 2 } },
+          { name: "Pinpoint Fire", cost: 620, icon: "speed", effects: { fireRateMul: 0.8 } },
+          { name: "Elite Marksman", cost: 980, icon: "target", effects: { damage: 3, fireRateMul: 0.86 } }
+        ],
+        rowB: [
+          { name: "Quick Scope", cost: 180, icon: "speed", effects: { fireRateMul: 0.9 } },
+          { name: "Trigger Tune", cost: 270, icon: "speed", effects: { fireRateMul: 0.85 } },
+          { name: "Watchful Eye", cost: 360, icon: "vision", effects: { range: 200 } },
+          { name: "Chain Shot", cost: 520, icon: "dart", effects: { damage: 1 } },
+          { name: "Rainfire", cost: 860, icon: "power", effects: { damage: 2, fireRateMul: 0.85 } }
+        ],
+        rowC: [
+          { name: "Front Grip", cost: 190, icon: "target", effects: { range: 120 } },
+          { name: "Calm Breath", cost: 260, icon: "vision", effects: { fireRateMul: 0.9 } },
+          { name: "Slick Bolt", cost: 350, icon: "speed", effects: { fireRateMul: 0.84 } },
+          { name: "Crack Shot", cost: 490, icon: "power", effects: { damage: 1 } },
+          { name: "Deadeye", cost: 820, icon: "target", effects: { damage: 2, range: 250 } }
+        ]
+      },
+      glue: {
+        rowA: [
+          { name: "Sticky Mix", cost: 150, icon: "glue", effects: { slowDuration: 0.9 } },
+          { name: "Syrup Coat", cost: 220, icon: "glue", effects: { slowDuration: 1.0 } },
+          { name: "Heavy Glue", cost: 320, icon: "power", effects: { damage: 1 } },
+          { name: "Thick Layer", cost: 470, icon: "glue", effects: { slowDuration: 1.3 } },
+          { name: "Mega Glue", cost: 760, icon: "target", effects: { damage: 2, slowDuration: 1.2 } }
+        ],
+        rowB: [
+          { name: "Wide Toss", cost: 140, icon: "range", effects: { range: 25 } },
+          { name: "Fast Sprayer", cost: 200, icon: "speed", effects: { fireRateMul: 0.86 } },
+          { name: "Bigger Arc", cost: 290, icon: "range", effects: { range: 35 } },
+          { name: "Quick Coat", cost: 410, icon: "speed", effects: { fireRateMul: 0.82 } },
+          { name: "Flood Spray", cost: 690, icon: "glue", effects: { damage: 1, fireRateMul: 0.84 } }
+        ],
+        rowC: [
+          { name: "Tacky Coat", cost: 135, icon: "glue", effects: { slowDuration: 0.7 } },
+          { name: "Dense Mix", cost: 210, icon: "power", effects: { damage: 1 } },
+          { name: "Quick Slosh", cost: 285, icon: "speed", effects: { fireRateMul: 0.88 } },
+          { name: "Long Hang", cost: 405, icon: "glue", effects: { slowDuration: 1.1 } },
+          { name: "Slipstream", cost: 680, icon: "target", effects: { slowDuration: 1.1, fireRateMul: 0.84 } }
+        ]
+      }
+    };
+
+    const tracks = [
+      {
+        id: "meadow",
+        name: "Meadow Bend",
+        points: [
+          [0.02, 0.20], [0.28, 0.20], [0.28, 0.56], [0.55, 0.56], [0.55, 0.30], [0.84, 0.30], [0.84, 0.76], [0.98, 0.76]
+        ]
+      },
+      {
+        id: "switchback",
+        name: "Switchback",
+        points: [
+          [0.02, 0.80], [0.22, 0.80], [0.22, 0.25], [0.45, 0.25], [0.45, 0.70], [0.68, 0.70], [0.68, 0.18], [0.98, 0.18]
+        ]
+      },
+      {
+        id: "river",
+        name: "River Curve",
+        points: [
+          [0.02, 0.40], [0.20, 0.40], [0.30, 0.18], [0.50, 0.18], [0.60, 0.60], [0.78, 0.60], [0.90, 0.38], [0.98, 0.38]
+        ]
+      }
+    ];
+
+    const state = {
+      phase: "start",
+      cash: 500,
+      score: 0,
+      lives: 20,
+      wave: 0,
+      selectedTrackId: tracks[0].id,
+      selectedMonkeyId: null,
+      monkeys: [],
+      balloons: [],
+      projectiles: [],
+      pointer: { x: 200, y: 200, usingKeyboard: false },
+      keys: new Set(),
+      keyboardLastEnterTime: 0,
+      touchLastTapTime: 0,
+      touchLastTapX: 0,
+      touchLastTapY: 0,
+      msgTimeout: 0,
+      gameTime: 0,
+      waveRunner: {
+        active: false,
+        spawnCount: 0,
+        spawned: 0,
+        spawnInterval: 0.45,
+        spawnTimer: 0,
+        balloonSpeed: 70
+      },
+      intermission: {
+        active: false,
+        duration: 20,
+        elapsed: 0,
+        promptShown: false
+      },
+      waveBonus: {
+        timer: 0
+      },
+      speed: {
+        multiplier: 1
+      },
+      sidebar: {
+        mode: "shop",
+        selectedPlacedMonkeyId: null
+      },
+      trackCache: {
+        points: [],
+        segments: [],
+        totalLength: 0
+      }
+    };
+
+    const TRACK_BLOCK_RADIUS = 54;
+    const MONKEY_RADIUS = 18;
+    const BALLOON_RADIUS = 12;
+    const SPEED_LEVELS = [1, 2, 3];
+    const SELL_REFUND_RATIO = 0.85;
+    const UPGRADE_PATH_KEYS = ["rowA", "rowB", "rowC"];
+
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function setMessage(text, duration = 1.5) {
+      msgLine.textContent = text;
+      state.msgTimeout = duration;
+    }
+
+    function speedLabel(multiplier) {
+      if (multiplier === 3) return "▶▶▶ 3x";
+      if (multiplier === 2) return "▶▶ 2x";
+      return "▶ 1x";
+    }
+
+    function refreshSpeedButton() {
+      speedBtn.textContent = speedLabel(state.speed.multiplier);
+    }
+
+    function getMonkeyType(id) {
+      return monkeyTypes.find((m) => m.id === id);
+    }
+
+    function resetRun() {
+      state.phase = "running";
+      state.cash = 500;
+      state.score = 0;
+      state.lives = 20;
+      state.wave = 0;
+      state.selectedMonkeyId = null;
+      state.monkeys = [];
+      state.balloons = [];
+      state.projectiles = [];
+      state.gameTime = 0;
+      state.waveRunner = {
+        active: false,
+        spawnCount: 0,
+        spawned: 0,
+        spawnInterval: 0.45,
+        spawnTimer: 0,
+        balloonSpeed: 70
+      };
+      state.intermission = {
+        active: false,
+        duration: 20,
+        elapsed: 0,
+        promptShown: false
+      };
+      state.waveBonus = {
+        timer: 0
+      };
+      state.speed = {
+        multiplier: 1
+      };
+      state.sidebar = {
+        mode: "shop",
+        selectedPlacedMonkeyId: null
+      };
+      state.pointer.usingKeyboard = false;
+      intermissionPopup.classList.add("hidden");
+      waveBonusPopup.classList.add("hidden");
+      gameOverScreen.classList.add("hidden");
+      rebuildTrackCache();
+      startWave(1);
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function buildTrackButtons() {
+      trackList.innerHTML = "";
+      for (const track of tracks) {
+        const btn = document.createElement("button");
+        btn.className = "trackBtn" + (track.id === state.selectedTrackId ? " selected" : "");
+        btn.textContent = track.name;
+        btn.addEventListener("click", () => {
+          state.selectedTrackId = track.id;
+          buildTrackButtons();
+          rebuildTrackCache();
+        });
+        trackList.appendChild(btn);
+      }
+    }
+
+    function findPlacedMonkeyById(id) {
+      return state.monkeys.find((m) => m.id === id) || null;
+    }
+
+    function upgradeIconSvg(iconName) {
+      const icons = {
+        dart: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20L20 4" stroke="#fbbf24" stroke-width="2.2"/><path d="M15 4h5v5" stroke="#fbbf24" stroke-width="2.2"/><path d="M4 20l4-1-3-3-1 4z" fill="#f59e0b"/></svg>`,
+        speed: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="#38bdf8" stroke-width="2"/><path d="M12 12L17 9" stroke="#38bdf8" stroke-width="2.2"/><path d="M4 12h2M18 12h2M12 4v2" stroke="#38bdf8" stroke-width="1.8"/></svg>`,
+        range: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="#a7f3d0" stroke-width="2"/><circle cx="12" cy="12" r="4.2" stroke="#22c55e" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="#22c55e"/></svg>`,
+        power: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l2.3 5.6L20 9l-4.3 3.9L17 19l-5-3-5 3 1.3-6.1L4 9l5.7-.4L12 3z" fill="#f97316"/></svg>`,
+        glue: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3c3.5 4 5.5 6.5 5.5 9.2A5.5 5.5 0 1 1 6.5 12.2C6.5 9.5 8.5 7 12 3z" fill="#22c55e"/><circle cx="10.5" cy="13" r="1.5" fill="#dcfce7"/></svg>`,
+        vision: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-5 10-5 10 5 10 5-3.6 5-10 5-10-5-10-5z" stroke="#c4b5fd" stroke-width="1.8"/><circle cx="12" cy="12" r="2.8" fill="#a78bfa"/></svg>`,
+        target: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="#fb7185" stroke-width="2"/><circle cx="12" cy="12" r="4.5" stroke="#fb7185" stroke-width="2"/><circle cx="12" cy="12" r="1.8" fill="#fb7185"/></svg>`
+      };
+      return icons[iconName] || icons.range;
+    }
+
+    function getUpgradeRows(typeId) {
+      return monkeyUpgradeRows[typeId] || { rowA: [], rowB: [], rowC: [] };
+    }
+
+    function getPrimaryRow(monkey) {
+      let primary = null;
+      let maxLevel = 0;
+      for (const key of UPGRADE_PATH_KEYS) {
+        const lvl = monkey.upgradeRows[key] || 0;
+        if (lvl > maxLevel) {
+          maxLevel = lvl;
+          primary = key;
+        }
+      }
+      return maxLevel >= 3 ? primary : null;
+    }
+
+    function isRowHardLocked(monkey, rowKey) {
+      const primary = getPrimaryRow(monkey);
+      if (!primary) return false;
+      if (rowKey === primary) return false;
+      const anyCrosspathTwo = UPGRADE_PATH_KEYS.some((key) => key !== primary && (monkey.upgradeRows[key] || 0) >= 2);
+      if (!anyCrosspathTwo) return false;
+      return true;
+    }
+
+    function applyUpgradeEffects(monkey, effects) {
+      if (!effects) return;
+      if (effects.damage) monkey.damage += effects.damage;
+      if (effects.range) monkey.range += effects.range;
+      if (effects.slowDuration) monkey.slowDuration += effects.slowDuration;
+      if (effects.fireRateMul) monkey.fireRate = Math.max(0.12, monkey.fireRate * effects.fireRateMul);
+    }
+
+    function getMonkeySellValue(monkey) {
+      return Math.floor((monkey.totalSpent || 0) * SELL_REFUND_RATIO);
+    }
+
+    function sellMonkey(monkeyId) {
+      if (state.phase !== "running") return;
+      const idx = state.monkeys.findIndex((m) => m.id === monkeyId);
+      if (idx === -1) return;
+      const monkey = state.monkeys[idx];
+      const refund = getMonkeySellValue(monkey);
+      const type = getMonkeyType(monkey.typeId);
+
+      state.cash += refund;
+      state.monkeys.splice(idx, 1);
+
+      if (state.sidebar.selectedPlacedMonkeyId === monkeyId) {
+        state.sidebar.mode = "shop";
+        state.sidebar.selectedPlacedMonkeyId = null;
+      }
+
+      setMessage((type ? type.name : "Monkey") + " sold for $" + refund + ".");
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function refreshMonkeyShop() {
+      sideTitle.textContent = "Monkeys";
+      sideContent.innerHTML = "";
+      for (const monkey of monkeyTypes) {
+        const affordable = state.cash >= monkey.cost;
+        const card = document.createElement("button");
+        card.className = "monkeyCard";
+        if (state.selectedMonkeyId === monkey.id) card.classList.add("selected");
+        if (!affordable) card.classList.add("disabled");
+        card.innerHTML = `
+          <div class="name">${monkey.name}</div>
+          <div class="meta">$${monkey.cost}</div>
+          <div class="desc">${monkey.description}</div>
+        `;
+        card.addEventListener("click", () => chooseMonkey(monkey.id));
+        sideContent.appendChild(card);
+      }
+    }
+
+    function createUpgradeTile(monkey, rowKey, tierIndex, upgrade) {
+      if (!upgrade) {
+        const empty = document.createElement("button");
+        empty.className = "upgradeTile locked";
+        empty.innerHTML = `<div class="upgradeTier">T${tierIndex + 1}</div><div class="upgradePrice">N/A</div>`;
+        return empty;
+      }
+
+      const level = monkey.upgradeRows[rowKey];
+      const purchased = tierIndex < level;
+      const isNext = tierIndex === level;
+      const lockedByProgress = tierIndex > level;
+      const lockedByRule = isRowHardLocked(monkey, rowKey) && isNext;
+      const lockedByCash = isNext && state.cash < upgrade.cost;
+      const locked = !purchased && (lockedByProgress || lockedByRule || lockedByCash);
+
+      const tile = document.createElement("button");
+      tile.className = "upgradeTile";
+      if (purchased) tile.classList.add("purchased");
+      if (isNext && !lockedByRule && !lockedByCash) tile.classList.add("next");
+      if (locked) tile.classList.add("locked");
+
+      let priceLabel = "Locked";
+      if (purchased) priceLabel = "Owned";
+      else if (isNext && lockedByRule) priceLabel = "Rule";
+      else if (isNext) priceLabel = "$" + upgrade.cost;
+
+      tile.innerHTML = `
+        <div class="upgradeIcon">${upgradeIconSvg(upgrade.icon)}</div>
+        <div class="upgradeTier">T${tierIndex + 1}</div>
+        <div class="upgradePrice">${priceLabel}</div>
+        <div class="upgradeMiniName">${upgrade.name}</div>
+      `;
+
+      tile.title = upgrade.name + " (" + (purchased ? "Purchased" : "$" + upgrade.cost) + ")";
+      tile.addEventListener("click", () => buyUpgrade(monkey.id, rowKey, tierIndex));
+      return tile;
+    }
+
+    function renderUpgradeRow(monkey, rowKey, label, upgrades) {
+      const wrap = document.createElement("div");
+      wrap.className = "upgradeRowWrap";
+
+      const head = document.createElement("div");
+      head.className = "upgradeRowHead";
+      head.innerHTML = `<span>${label}</span><span>${monkey.upgradeRows[rowKey]}/5</span>`;
+      wrap.appendChild(head);
+
+      const grid = document.createElement("div");
+      grid.className = "upgradeRowGrid";
+      for (let tier = 0; tier < 5; tier++) {
+        const upgrade = upgrades[tier];
+        grid.appendChild(createUpgradeTile(monkey, rowKey, tier, upgrade));
+      }
+      wrap.appendChild(grid);
+      return wrap;
+    }
+
+    function refreshUpgradePanel() {
+      const monkey = findPlacedMonkeyById(state.sidebar.selectedPlacedMonkeyId);
+      if (!monkey) {
+        state.sidebar.mode = "shop";
+        refreshMonkeyShop();
+        return;
+      }
+
+      const type = getMonkeyType(monkey.typeId);
+      const rows = getUpgradeRows(monkey.typeId);
+      sideTitle.textContent = type.name + " Upgrades";
+      sideContent.innerHTML = "";
+
+      const backBtn = document.createElement("button");
+      backBtn.className = "smallBtn";
+      backBtn.textContent = "Back To Monkey Bar";
+      backBtn.addEventListener("click", () => {
+        state.sidebar.mode = "shop";
+        state.sidebar.selectedPlacedMonkeyId = null;
+        refreshSideBar();
+      });
+      sideContent.appendChild(backBtn);
+
+      const summary = document.createElement("div");
+      summary.className = "selectedSummary";
+      const buildCode = `${monkey.upgradeRows.rowA}-${monkey.upgradeRows.rowB}-${monkey.upgradeRows.rowC}`;
+      summary.innerHTML = `
+        <div><strong>${type.name}</strong></div>
+        <div>Damage/Shot: ${monkey.damage}</div>
+        <div>Damage Dealt: ${Math.floor(monkey.damageDealt)}</div>
+        <div>Rate: ${monkey.fireRate.toFixed(2)}s</div>
+        <div>Range: ${Math.round(monkey.range)}</div>
+        <div>Sell Value: $${getMonkeySellValue(monkey)}</div>
+        <div>Build: ${buildCode}</div>
+      `;
+      sideContent.appendChild(summary);
+
+      const sellBtn = document.createElement("button");
+      sellBtn.className = "smallBtn";
+      sellBtn.textContent = "Sell Monkey ($" + getMonkeySellValue(monkey) + ")";
+      sellBtn.addEventListener("click", () => sellMonkey(monkey.id));
+      sideContent.appendChild(sellBtn);
+
+      const hint = document.createElement("div");
+      hint.className = "upgradeHint";
+      hint.textContent = "Build format is Path1-Path2-Path3 (example: 5-2-0). Once one path is 3+ and any other reaches 2, only the 3+ path can be upgraded further.";
+      sideContent.appendChild(hint);
+
+      sideContent.appendChild(renderUpgradeRow(monkey, "rowA", "Path 1", rows.rowA));
+      sideContent.appendChild(renderUpgradeRow(monkey, "rowB", "Path 2", rows.rowB));
+      sideContent.appendChild(renderUpgradeRow(monkey, "rowC", "Path 3", rows.rowC));
+    }
+
+    function refreshSideBar() {
+      if (state.sidebar.mode === "upgrade") {
+        refreshUpgradePanel();
+      } else {
+        refreshMonkeyShop();
+      }
+    }
+
+    function refreshHud() {
+      cashLabel.textContent = Math.floor(state.cash).toString();
+      scoreLabel.textContent = Math.floor(state.score).toString();
+      livesLabel.textContent = Math.max(0, state.lives).toString();
+      waveLabel.textContent = state.wave.toString();
+
+      if (state.phase === "gameover") {
+        phaseLabel.textContent = "Phase: Game Over";
+      } else if (state.intermission.active) {
+        const left = Math.max(0, Math.ceil(state.intermission.duration - state.intermission.elapsed));
+        phaseLabel.textContent = "Phase: Intermission (" + left + "s)";
+      } else if (state.waveRunner.active) {
+        phaseLabel.textContent = "Phase: Wave In Progress";
+      } else {
+        phaseLabel.textContent = "Phase: Waiting";
+      }
+      refreshSpeedButton();
+    }
+
+    function chooseMonkey(monkeyId) {
+      if (state.phase !== "running") return;
+      const monkey = getMonkeyType(monkeyId);
+      if (!monkey) return;
+      if (state.selectedMonkeyId === monkeyId) {
+        state.selectedMonkeyId = null;
+        setMessage(monkey.name + " unequipped.");
+        refreshSideBar();
+        return;
+      }
+      if (state.cash < monkey.cost) {
+        setMessage("Not enough cash for " + monkey.name);
+        return;
+      }
+      state.sidebar.mode = "shop";
+      state.sidebar.selectedPlacedMonkeyId = null;
+      state.selectedMonkeyId = monkeyId;
+      setMessage("Placing " + monkey.name + ": double-click / double-tap / double-Enter to confirm.");
+      refreshSideBar();
+    }
+
+    function selectPlacedMonkey(monkeyId) {
+      if (state.phase !== "running") return;
+      if (state.sidebar.mode === "upgrade" && state.sidebar.selectedPlacedMonkeyId === monkeyId) {
+        state.sidebar.mode = "shop";
+        state.sidebar.selectedPlacedMonkeyId = null;
+        setMessage("Monkey unequipped.");
+        refreshSideBar();
+        return;
+      }
+      state.selectedMonkeyId = null;
+      state.sidebar.mode = "upgrade";
+      state.sidebar.selectedPlacedMonkeyId = monkeyId;
+      refreshSideBar();
+    }
+
+    function buyUpgrade(monkeyId, rowKey, tierIndex) {
+      if (state.phase !== "running") return;
+      const monkey = findPlacedMonkeyById(monkeyId);
+      if (!monkey) return;
+      const rows = getUpgradeRows(monkey.typeId);
+      const upgrades = rows[rowKey] || [];
+      const upgrade = upgrades[tierIndex];
+      if (!upgrade) return;
+
+      const currentTier = monkey.upgradeRows[rowKey];
+      if (tierIndex < currentTier) return;
+      if (tierIndex > currentTier) {
+        setMessage("Buy upgrades in order.");
+        return;
+      }
+      if (isRowHardLocked(monkey, rowKey)) {
+        setMessage("This row is locked. Upgrade the 3+ row.");
+        return;
+      }
+      if (state.cash < upgrade.cost) {
+        setMessage("Not enough cash for " + upgrade.name + ".");
+        return;
+      }
+
+      state.cash -= upgrade.cost;
+      monkey.totalSpent = (monkey.totalSpent || 0) + upgrade.cost;
+      monkey.upgradeRows[rowKey] += 1;
+      applyUpgradeEffects(monkey, upgrade.effects);
+
+      setMessage(upgrade.name + " purchased.");
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function currentTrack() {
+      return tracks.find((t) => t.id === state.selectedTrackId) || tracks[0];
+    }
+
+    function rebuildTrackCache() {
+      const track = currentTrack();
+      const width = canvas.width;
+      const height = canvas.height;
+      const points = track.points.map(([x, y]) => ({ x: x * width, y: y * height }));
+      const segments = [];
+      let totalLength = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        segments.push({ a, b, len, startDist: totalLength });
+        totalLength += len;
+      }
+      state.trackCache = { points, segments, totalLength };
+    }
+
+    function getPointAtDistance(distance) {
+      const cache = state.trackCache;
+      if (cache.segments.length === 0) return { x: 0, y: 0 };
+
+      if (distance <= 0) {
+        const first = cache.segments[0];
+        const t = distance / Math.max(1, first.len);
+        return {
+          x: first.a.x + (first.b.x - first.a.x) * t,
+          y: first.a.y + (first.b.y - first.a.y) * t
+        };
+      }
+
+      if (distance >= cache.totalLength) {
+        const last = cache.segments[cache.segments.length - 1];
+        return { x: last.b.x, y: last.b.y };
+      }
+
+      for (const seg of cache.segments) {
+        if (distance >= seg.startDist && distance <= seg.startDist + seg.len) {
+          const t = (distance - seg.startDist) / seg.len;
+          return {
+            x: seg.a.x + (seg.b.x - seg.a.x) * t,
+            y: seg.a.y + (seg.b.y - seg.a.y) * t
+          };
+        }
+      }
+      const end = cache.segments[cache.segments.length - 1].b;
+      return { x: end.x, y: end.y };
+    }
+
+    function pointSegmentDistance(px, py, ax, ay, bx, by) {
+      const vx = bx - ax;
+      const vy = by - ay;
+      const wx = px - ax;
+      const wy = py - ay;
+      const c1 = vx * wx + vy * wy;
+      if (c1 <= 0) return Math.hypot(px - ax, py - ay);
+      const c2 = vx * vx + vy * vy;
+      if (c2 <= 0) return Math.hypot(px - ax, py - ay);
+      if (c2 <= c1) return Math.hypot(px - bx, py - by);
+      const t = c1 / c2;
+      const projX = ax + t * vx;
+      const projY = ay + t * vy;
+      return Math.hypot(px - projX, py - projY);
+    }
+
+    function canPlaceMonkey(x, y) {
+      if (x < MONKEY_RADIUS || y < MONKEY_RADIUS || x > canvas.width - MONKEY_RADIUS || y > canvas.height - MONKEY_RADIUS) {
+        return false;
+      }
+
+      for (const seg of state.trackCache.segments) {
+        const d = pointSegmentDistance(x, y, seg.a.x, seg.a.y, seg.b.x, seg.b.y);
+        if (d < TRACK_BLOCK_RADIUS) return false;
+      }
+
+      for (const m of state.monkeys) {
+        if (Math.hypot(x - m.x, y - m.y) < MONKEY_RADIUS * 2.1) return false;
+      }
+
+      return true;
+    }
+
+    function findMonkeyAtPosition(x, y) {
+      for (let i = state.monkeys.length - 1; i >= 0; i--) {
+        const monkey = state.monkeys[i];
+        if (Math.hypot(x - monkey.x, y - monkey.y) <= MONKEY_RADIUS + 6) return monkey;
+      }
+      return null;
+    }
+
+    function tryPlaceSelectedMonkey(x, y) {
+      if (state.phase !== "running" || !state.selectedMonkeyId) return;
+      const type = getMonkeyType(state.selectedMonkeyId);
+      if (!type) return;
+      if (state.cash < type.cost) {
+        setMessage("Not enough cash.");
+        return;
+      }
+      if (!canPlaceMonkey(x, y)) {
+        setMessage("Cannot place there.");
+        return;
+      }
+      state.cash -= type.cost;
+      state.monkeys.push({
+        id: crypto.randomUUID(),
+        typeId: type.id,
+        x,
+        y,
+        cooldown: 0,
+        range: type.range,
+        fireRate: type.fireRate,
+        damage: type.damage,
+        damageDealt: 0,
+        totalSpent: type.cost,
+        slowDuration: 2.0,
+        upgradeRows: { rowA: 0, rowB: 0, rowC: 0 },
+        lookX: 0,
+        lookY: 0,
+        lookTargetX: 0,
+        lookTargetY: 0,
+        lookTimer: 0.5 + Math.random() * 1.2,
+        lookLock: false
+      });
+      setMessage(type.name + " placed.");
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function getBalloonMaxHp(type) {
+      return type === "green" ? 5 : 2;
+    }
+
+    function chooseWaveBalloonType() {
+      if (state.wave < 2) return "red";
+      if (state.waveRunner.spawned % 4 === 0) return "green";
+      return "red";
+    }
+
+    function spawnBalloon() {
+      const id = crypto.randomUUID();
+      const type = chooseWaveBalloonType();
+      const hp = getBalloonMaxHp(type);
+      state.balloons.push({
+        id,
+        type,
+        hp,
+        maxHp: hp,
+        distance: -state.waveRunner.spawned * 24,
+        speed: state.waveRunner.balloonSpeed,
+        x: 0,
+        y: 0,
+        slowUntil: 0
+      });
+    }
+
+    function startWave(number) {
+      state.wave = number;
+      state.waveRunner.active = true;
+      state.waveRunner.spawnCount = 10 + number * 5;
+      state.waveRunner.spawned = 0;
+      state.waveRunner.spawnInterval = Math.max(0.2, 0.56 - number * 0.02);
+      state.waveRunner.spawnTimer = 0;
+      state.waveRunner.balloonSpeed = 64 + number * 4;
+
+      state.intermission.active = false;
+      state.intermission.elapsed = 0;
+      state.intermission.promptShown = false;
+      intermissionPopup.classList.add("hidden");
+      refreshHud();
+    }
+
+    function startIntermission() {
+      state.intermission.active = true;
+      state.intermission.duration = 20;
+      state.intermission.elapsed = 0;
+      state.intermission.promptShown = false;
+      state.waveRunner.active = false;
+      intermissionPopup.classList.add("hidden");
+      refreshHud();
+    }
+
+    function onBalloonPopped(balloon) {
+      if (balloon.type === "red") {
+        state.cash += 3;
+      }
+      state.score += 10;
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function onBalloonEscaped() {
+      state.lives -= 1;
+      refreshHud();
+      if (state.lives <= 0) {
+        endGame();
+      }
+    }
+
+    function endGame() {
+      state.phase = "gameover";
+      state.waveRunner.active = false;
+      state.intermission.active = false;
+      intermissionPopup.classList.add("hidden");
+      waveBonusPopup.classList.add("hidden");
+      gameOverText.textContent = "You reached wave " + state.wave + " with score " + state.score + ".";
+      gameOverScreen.classList.remove("hidden");
+      refreshHud();
+    }
+
+    function grantWaveBonus(wave) {
+      const amount = 25 + wave * 15;
+      state.cash += amount;
+      waveBonusPopup.textContent = "Wave bonus: $" + amount;
+      waveBonusPopup.classList.remove("hidden");
+      state.waveBonus.timer = 2.5;
+      refreshHud();
+      refreshSideBar();
+    }
+
+    function findTarget(monkey) {
+      let best = null;
+      let bestProgress = -Infinity;
+      for (const balloon of state.balloons) {
+        const dx = balloon.x - monkey.x;
+        const dy = balloon.y - monkey.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= monkey.range) {
+          if (balloon.distance > bestProgress) {
+            bestProgress = balloon.distance;
+            best = balloon;
+          }
+        }
+      }
+      return best;
+    }
+
+    function fireAtTarget(monkey, type, target) {
+      const toX = target.x - monkey.x;
+      const toY = target.y - monkey.y;
+      const mag = Math.max(0.0001, Math.hypot(toX, toY));
+      if (monkey.typeId === "sniper") {
+        monkey.lookTargetX = clamp((toX / mag) * 2.6, -2.8, 2.8);
+        monkey.lookTargetY = clamp((toY / mag) * 1.9, -2.2, 2.2);
+        monkey.lookLock = true;
+      }
+
+      state.projectiles.push({
+        x1: monkey.x,
+        y1: monkey.y,
+        x2: target.x,
+        y2: target.y,
+        color: type.dartColor,
+        life: 0.12,
+        maxLife: 0.12
+      });
+
+      const idx = state.balloons.findIndex((b) => b.id === target.id);
+      if (idx === -1) return;
+      const balloon = state.balloons[idx];
+
+      if (type.id === "glue") {
+        balloon.slowUntil = state.gameTime + monkey.slowDuration;
+      }
+
+      if (balloon.type === "green" && monkey.typeId === "dart") {
+        monkey.damageDealt += 1;
+        balloon.type = "red";
+        balloon.maxHp = getBalloonMaxHp("red");
+        balloon.hp = balloon.maxHp;
+        return;
+      }
+
+      if (monkey.damage > 0) {
+        const dealt = Math.min(monkey.damage, balloon.hp);
+        monkey.damageDealt += dealt;
+        balloon.hp -= monkey.damage;
+        if (balloon.hp <= 0) {
+          onBalloonPopped(balloon);
+          state.balloons.splice(idx, 1);
+        }
+      }
+    }
+
+    function updateMonkeyLooks(dt) {
+      for (const monkey of state.monkeys) {
+        monkey.lookTimer -= dt;
+
+        if (state.intermission.active && monkey.lookTimer <= 0 && !(monkey.typeId === "sniper" && monkey.lookLock)) {
+          monkey.lookTimer = 0.45 + Math.random() * 1.2;
+          if (Math.random() < 0.75) {
+            monkey.lookTargetX = (Math.random() * 2 - 1) * 2.6;
+            monkey.lookTargetY = (Math.random() * 2 - 1) * 1.8;
+          } else {
+            monkey.lookTargetX = 0;
+            monkey.lookTargetY = 0;
+          }
+        }
+
+        if (!state.intermission.active) {
+          if (!(monkey.typeId === "sniper" && monkey.lookLock)) {
+            monkey.lookTargetX = 0;
+            monkey.lookTargetY = 0;
+          }
+          if (monkey.lookTimer <= 0) monkey.lookTimer = 0.7 + Math.random() * 0.8;
+        }
+
+        const smoothing = 1 - Math.exp(-dt * 8);
+        monkey.lookX += (monkey.lookTargetX - monkey.lookX) * smoothing;
+        monkey.lookY += (monkey.lookTargetY - monkey.lookY) * smoothing;
+      }
+    }
+
+    function updateMonkeys(dt) {
+      for (const monkey of state.monkeys) {
+        const type = getMonkeyType(monkey.typeId);
+        if (!type) continue;
+        monkey.cooldown -= dt;
+        if (monkey.cooldown > 0) continue;
+        const target = findTarget(monkey);
+        if (!target) continue;
+        fireAtTarget(monkey, type, target);
+        monkey.cooldown = monkey.fireRate;
+      }
+    }
+
+    function updateProjectiles(dt) {
+      for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        const p = state.projectiles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+          state.projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    function updateBalloons(dt) {
+      for (let i = state.balloons.length - 1; i >= 0; i--) {
+        const b = state.balloons[i];
+        const slow = state.gameTime < b.slowUntil ? 0.55 : 1;
+        b.distance += b.speed * slow * dt;
+        const pos = getPointAtDistance(b.distance);
+        b.x = pos.x;
+        b.y = pos.y;
+        if (b.distance >= state.trackCache.totalLength) {
+          state.balloons.splice(i, 1);
+          onBalloonEscaped();
+        }
+      }
+    }
+
+    function updateWaves(dt) {
+      if (state.waveRunner.active) {
+        state.waveRunner.spawnTimer += dt;
+        while (state.waveRunner.spawned < state.waveRunner.spawnCount && state.waveRunner.spawnTimer >= state.waveRunner.spawnInterval) {
+          state.waveRunner.spawnTimer -= state.waveRunner.spawnInterval;
+          state.waveRunner.spawned++;
+          spawnBalloon();
+        }
+        if (state.waveRunner.spawned >= state.waveRunner.spawnCount && state.balloons.length === 0) {
+          grantWaveBonus(state.wave);
+          startIntermission();
+        }
+      } else if (state.intermission.active) {
+        state.intermission.elapsed += dt;
+        if (!state.intermission.promptShown && state.intermission.elapsed >= 5) {
+          state.intermission.promptShown = true;
+          intermissionPopup.classList.remove("hidden");
+        }
+        if (state.intermission.elapsed >= state.intermission.duration) {
+          startWave(state.wave + 1);
+        }
+        refreshHud();
+      }
+    }
+
+    function updateKeyboardPointer(dt) {
+      if (!state.selectedMonkeyId) return;
+      let moved = false;
+      const speed = 350;
+      if (state.keys.has("ArrowLeft") || state.keys.has("a")) {
+        state.pointer.x -= speed * dt;
+        moved = true;
+      }
+      if (state.keys.has("ArrowRight") || state.keys.has("d")) {
+        state.pointer.x += speed * dt;
+        moved = true;
+      }
+      if (state.keys.has("ArrowUp") || state.keys.has("w")) {
+        state.pointer.y -= speed * dt;
+        moved = true;
+      }
+      if (state.keys.has("ArrowDown") || state.keys.has("s")) {
+        state.pointer.y += speed * dt;
+        moved = true;
+      }
+      state.pointer.x = clamp(state.pointer.x, 0, canvas.width);
+      state.pointer.y = clamp(state.pointer.y, 0, canvas.height);
+      if (moved) state.pointer.usingKeyboard = true;
+    }
+
+    function drawTrack() {
+      const points = state.trackCache.points;
+      if (points.length < 2) return;
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      if (state.selectedMonkeyId && state.phase === "running") {
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.28)";
+        ctx.lineWidth = TRACK_BLOCK_RADIUS * 2;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#6b7280";
+      ctx.lineWidth = 44;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#9ca3af";
+      ctx.lineWidth = 26;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+
+      const start = points[0];
+      const end = points[points.length - 1];
+      ctx.fillStyle = "#22c55e";
+      ctx.beginPath();
+      ctx.arc(start.x, start.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDartMonkey(monkey, ghost = false, valid = true) {
+      const lookX = monkey.lookX || 0;
+      const lookY = monkey.lookY || 0;
+
+      const base = ghost ? (valid ? "rgba(251, 191, 36, 0.82)" : "rgba(239, 68, 68, 0.82)") : "#b9682a";
+      const dark = ghost ? (valid ? "rgba(120, 53, 15, 0.92)" : "rgba(127, 29, 29, 0.95)") : "#6f3415";
+      const skin = ghost ? (valid ? "rgba(254, 240, 138, 0.82)" : "rgba(252, 165, 165, 0.82)") : "#e6a33e";
+      const outline = ghost ? (valid ? "rgba(92, 37, 12, 0.95)" : "rgba(127, 29, 29, 1)") : "#5b2f14";
+
+      ctx.save();
+      ctx.translate(monkey.x, monkey.y);
+      ctx.scale(1.06, 1.06);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+      ctx.beginPath();
+      ctx.ellipse(0, 14.5, 14.5, 5.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(8, 8);
+      ctx.bezierCurveTo(17, 10, 22, 14, 21, 19);
+      ctx.bezierCurveTo(19, 23, 13, 23, 15, 19);
+      ctx.stroke();
+
+      ctx.fillStyle = base;
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 2.8, 10.3, 8.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.ellipse(-9.6, 1.8, 3.4, 4.2, 0.15, 0, Math.PI * 2);
+      ctx.ellipse(9.6, 1.8, 3.4, 4.2, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = base;
+      ctx.strokeStyle = outline;
+      ctx.beginPath();
+      ctx.moveTo(-5.4, -16.3);
+      ctx.lineTo(-1.5, -24);
+      ctx.lineTo(1.5, -18.3);
+      ctx.lineTo(5.2, -24.8);
+      ctx.lineTo(8.8, -16.6);
+      ctx.lineTo(6.5, -10.7);
+      ctx.lineTo(-6.2, -10.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = base;
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 2.1;
+      ctx.beginPath();
+      ctx.ellipse(0, -6.5, 13.2, 11.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      ctx.ellipse(0, -0.6, 8.4, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(-5.8, -6.3, 4.8, 5.8, 0, 0, Math.PI * 2);
+      ctx.ellipse(5.3, -6.1, 5.2, 6.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const pupilX = clamp(lookX, -2.2, 2.2) * 0.72;
+      const pupilY = clamp(lookY, -1.8, 1.8) * 0.72;
+      ctx.fillStyle = "#8d4e20";
+      ctx.beginPath();
+      ctx.ellipse(-5.7 + pupilX, -5.7 + pupilY, 2, 2.45, 0, 0, Math.PI * 2);
+      ctx.ellipse(5.35 + pupilX, -5.5 + pupilY, 2.1, 2.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#2f1a0f";
+      ctx.beginPath();
+      ctx.arc(-5.45 + pupilX, -6.2 + pupilY, 0.72, 0, Math.PI * 2);
+      ctx.arc(5.6 + pupilX, -6 + pupilY, 0.72, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-8.8, -11.2);
+      ctx.lineTo(-3.5, -13.2);
+      ctx.moveTo(2.4, -13.4);
+      ctx.lineTo(9.2, -11.2);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(68, 37, 17, 0.9)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(-0.2, -0.1, 1.5, 0.3, 2.3);
+      ctx.stroke();
+
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.ellipse(-11.8, 3.3, 4.2, 2.3, -0.15, 0, Math.PI * 2);
+      ctx.ellipse(11.8, 3.6, 4.3, 2.3, 0.16, 0, Math.PI * 2);
+      ctx.fill();
+
+      const dartStroke = ghost && !valid ? "#ef4444" : "#4b5563";
+      ctx.strokeStyle = dartStroke;
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(-13.2, 2.8);
+      ctx.lineTo(-20.2, 8.2);
+      ctx.stroke();
+
+      ctx.fillStyle = ghost && !valid ? "#fca5a5" : "#d1d5db";
+      ctx.beginPath();
+      ctx.moveTo(-20.4, 8.4);
+      ctx.lineTo(-23.2, 10.9);
+      ctx.lineTo(-18.9, 9.8);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = ghost && !valid ? "#fca5a5" : "#facc15";
+      ctx.beginPath();
+      ctx.arc(-12.2, 2.1, 1.1, 0, Math.PI * 2);
+      ctx.arc(-13.5, 2.1, 1.1, 0, Math.PI * 2);
+      ctx.lineTo(-12.85, 3.7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawSniperMonkey(monkey, ghost = false, valid = true) {
+      const lookX = monkey.lookX || 0;
+      const lookY = monkey.lookY || 0;
+      const p1 = monkey.upgradeRows?.rowA || 0;
+      const p2 = monkey.upgradeRows?.rowB || 0;
+      const p3 = monkey.upgradeRows?.rowC || 0;
+      const build = `${p1}-${p2}-${p3}`;
+
+      const body = ghost ? (valid ? "rgba(179, 109, 60, 0.82)" : "rgba(239, 68, 68, 0.82)") : "#a85e2f";
+      const dark = ghost ? (valid ? "rgba(30, 41, 59, 0.9)" : "rgba(127, 29, 29, 0.95)") : "#2f3340";
+      const skin = ghost ? (valid ? "rgba(232, 183, 112, 0.82)" : "rgba(252, 165, 165, 0.82)") : "#d59a5d";
+      const outline = ghost ? (valid ? "rgba(30, 41, 59, 0.88)" : "rgba(127, 29, 29, 1)") : "#3a2615";
+
+      let style = {
+        helmetTop: "#263244",
+        helmetSide: "#1f2937",
+        badge: "#facc15",
+        stripeA: "#ef4444",
+        stripeB: "#f59e0b",
+        stripeMode: "single",
+        visor: "#202733",
+        lens: "#84cc16",
+        lensHighlight: "#dcfce7",
+        rifleBody: "#374151",
+        rifleAccent: "#ef4444",
+        rifleTip: "#d1d5db",
+        foliageLevel: 0,
+        foliageColor: "#587a2f",
+        cheekPaint: false
+      };
+
+      if (p1 >= 5) {
+        style.helmetTop = "#111827";
+        style.helmetSide = "#1f2937";
+        style.stripeMode = "burst";
+        style.stripeA = "#f59e0b";
+        style.stripeB = "#facc15";
+      } else if (p2 >= 3) {
+        style.helmetTop = "#38451f";
+        style.helmetSide = "#27341a";
+        style.stripeA = "#84cc16";
+        style.stripeB = "#a3e635";
+        style.stripeMode = "dual";
+      }
+
+      if (p3 >= 3) {
+        style.foliageLevel = p3 >= 5 ? 2 : 1;
+        style.foliageColor = "#5f7f2a";
+        style.helmetTop = "#3f6212";
+        style.helmetSide = "#365314";
+        style.stripeA = "#bef264";
+        style.stripeB = "#84cc16";
+        style.stripeMode = "chevron";
+      }
+
+      // Build-accurate presets for the 5-x-x sniper variants.
+      const buildPresets = {
+        "5-2-0": {
+          helmetTop: "#8c1718",
+          helmetSide: "#5f1113",
+          badge: "#facc15",
+          stripeA: "#facc15",
+          stripeB: "#fb923c",
+          stripeMode: "burst",
+          visor: "#2a313b",
+          lens: "#84cc16",
+          rifleAccent: "#ef4444",
+          foliageLevel: 2,
+          foliageColor: "#5d7e2a",
+          cheekPaint: true
+        },
+        "5-1-0": {
+          helmetTop: "#7e22ce",
+          helmetSide: "#581c87",
+          badge: "#facc15",
+          stripeA: "#facc15",
+          stripeB: "#c084fc",
+          stripeMode: "burst",
+          visor: "#2a313b",
+          lens: "#84cc16",
+          rifleAccent: "#ef4444",
+          foliageLevel: 2,
+          foliageColor: "#5c7b2c",
+          cheekPaint: true
+        },
+        "5-0-0": {
+          helmetTop: "#1f2430",
+          helmetSide: "#0f172a",
+          badge: "#facc15",
+          stripeA: "#f59e0b",
+          stripeB: "#f97316",
+          stripeMode: "burst",
+          visor: "#232b36",
+          lens: "#84cc16",
+          rifleAccent: "#ef4444",
+          foliageLevel: 2,
+          foliageColor: "#58752a",
+          cheekPaint: true
+        },
+        "5-0-1": {
+          helmetTop: "#1f2430",
+          helmetSide: "#0f172a",
+          badge: "#facc15",
+          stripeA: "#d1d5db",
+          stripeB: "#9ca3af",
+          stripeMode: "single",
+          visor: "#232b36",
+          lens: "#84cc16",
+          lensHighlight: "#ecfccb",
+          rifleAccent: "#f97316",
+          foliageLevel: 2,
+          foliageColor: "#6a8d35",
+          cheekPaint: false
+        },
+        "5-0-2": {
+          helmetTop: "#222733",
+          helmetSide: "#111827",
+          badge: "#facc15",
+          stripeA: "#f97316",
+          stripeB: "#fbbf24",
+          stripeMode: "dual",
+          visor: "#232b36",
+          lens: "#84cc16",
+          lensHighlight: "#ecfccb",
+          rifleAccent: "#fb923c",
+          foliageLevel: 2,
+          foliageColor: "#7aa23c",
+          cheekPaint: false
+        }
+      };
+
+      if (buildPresets[build]) {
+        style = { ...style, ...buildPresets[build] };
+      }
+
+      if (ghost && !valid) {
+        style = {
+          ...style,
+          helmetTop: "#b91c1c",
+          helmetSide: "#7f1d1d",
+          badge: "#fee2e2",
+          stripeA: "#fecaca",
+          stripeB: "#fca5a5",
+          visor: "#7f1d1d",
+          lens: "#fecaca",
+          lensHighlight: "#fee2e2",
+          rifleBody: "#991b1b",
+          rifleAccent: "#fca5a5",
+          rifleTip: "#fee2e2",
+          foliageColor: "#dc2626"
+        };
+      }
+
+      ctx.save();
+      ctx.translate(monkey.x, monkey.y);
+      ctx.scale(1.04, 1.04);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.fillStyle = "rgba(0,0,0,0.24)";
+      ctx.beginPath();
+      ctx.ellipse(0, 14.8, 14.2, 5.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (style.foliageLevel > 0) {
+        ctx.fillStyle = ghost ? "rgba(132, 204, 22, 0.45)" : style.foliageColor;
+        const leafCount = style.foliageLevel === 2 ? 10 : 6;
+        for (let i = 0; i < leafCount; i++) {
+          const a = (Math.PI * 2 * i) / leafCount;
+          const rx = Math.cos(a) * (10.2 + (i % 2));
+          const ry = Math.sin(a) * 6.1 - 5.2;
+          ctx.beginPath();
+          ctx.ellipse(rx, ry, 3.3, 2.1, a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.fillStyle = body;
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 9.5, 8.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = body;
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 2.1;
+      ctx.beginPath();
+      ctx.ellipse(0, -6.5, 12.5, 10.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = style.helmetTop;
+      ctx.beginPath();
+      ctx.moveTo(-9.2, -12.5);
+      ctx.lineTo(8.9, -12.3);
+      ctx.lineTo(7.5, -9.3);
+      ctx.lineTo(-9.4, -9.4);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = style.helmetSide;
+      ctx.beginPath();
+      ctx.moveTo(-9.6, -9.5);
+      ctx.lineTo(7.5, -9.4);
+      ctx.lineTo(7.2, -6.8);
+      ctx.lineTo(-9.9, -6.9);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = style.stripeA;
+      ctx.lineWidth = 2.1;
+      if (style.stripeMode === "single") {
+        ctx.beginPath();
+        ctx.moveTo(-0.8, -12.1);
+        ctx.lineTo(-0.1, -7.1);
+        ctx.stroke();
+      } else if (style.stripeMode === "dual") {
+        ctx.beginPath();
+        ctx.moveTo(-2.5, -12.1);
+        ctx.lineTo(-1.7, -7.2);
+        ctx.moveTo(1.4, -12.1);
+        ctx.lineTo(2.2, -7.2);
+        ctx.stroke();
+      } else if (style.stripeMode === "chevron") {
+        ctx.beginPath();
+        ctx.moveTo(-2.6, -11.8);
+        ctx.lineTo(-0.1, -8.9);
+        ctx.lineTo(2.4, -11.8);
+        ctx.stroke();
+      } else if (style.stripeMode === "burst") {
+        ctx.beginPath();
+        ctx.moveTo(-2.6, -11.7);
+        ctx.lineTo(-1.1, -9.7);
+        ctx.moveTo(0, -12.15);
+        ctx.lineTo(0, -9.2);
+        ctx.moveTo(2.6, -11.7);
+        ctx.lineTo(1.1, -9.7);
+        ctx.stroke();
+        ctx.strokeStyle = style.stripeB;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-0.1, -11.6);
+        ctx.lineTo(-0.1, -7.7);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = style.badge;
+      ctx.beginPath();
+      ctx.arc(8.2, -9.6, 1.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      ctx.ellipse(0, -0.8, 8.1, 5.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = style.visor;
+      ctx.beginPath();
+      ctx.moveTo(-7.9, -8.1);
+      ctx.lineTo(7.6, -8.1);
+      ctx.lineTo(8.2, -5.4);
+      ctx.lineTo(-8.5, -5.5);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = style.lens;
+      ctx.beginPath();
+      ctx.ellipse(-4.8, -6.8, 2.3, 2.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(4.8, -6.8, 2.3, 2.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = style.lensHighlight;
+      ctx.beginPath();
+      ctx.ellipse(-4.1, -7.3, 0.7, 0.45, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(5.5, -7.3, 0.7, 0.45, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (style.foliageLevel < 2) {
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.ellipse(-4.8, -4.2, 2.8, 2.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(4.8, -4.2, 2.8, 2.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const px = clamp(lookX, -2.2, 2.2) * 0.62;
+        const py = clamp(lookY, -1.8, 1.8) * 0.62;
+        ctx.fillStyle = "#3b2417";
+        ctx.beginPath();
+        ctx.arc(-4.8 + px, -4.2 + py, 1, 0, Math.PI * 2);
+        ctx.arc(4.8 + px, -4.2 + py, 1, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = "#f8fafc";
+        ctx.beginPath();
+        ctx.ellipse(-3.8, -4.4, 1.5, 1.8, 0, 0, Math.PI * 2);
+        ctx.ellipse(3.8, -4.4, 1.5, 1.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (style.cheekPaint) {
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-6.6, -2.4);
+        ctx.lineTo(-4.7, -1.9);
+        ctx.moveTo(4.7, -1.9);
+        ctx.lineTo(6.6, -2.4);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.ellipse(-11.5, 3.4, 3.8, 2.1, -0.08, 0, Math.PI * 2);
+      ctx.ellipse(11.5, 3.5, 3.8, 2.1, 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      let vx = lookX;
+      let vy = lookY;
+      if (Math.hypot(vx, vy) < 0.18) {
+        vx = 1;
+        vy = 0;
+      }
+      const angle = Math.atan2(vy, vx);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const rifleStartX = cos * 6.2 - sin * 2;
+      const rifleStartY = sin * 6.2 + cos * 2;
+      const rifleEndX = cos * 18.8;
+      const rifleEndY = sin * 18.8;
+
+      ctx.strokeStyle = style.rifleBody;
+      ctx.lineWidth = 4.4;
+      ctx.beginPath();
+      ctx.moveTo(rifleStartX, rifleStartY);
+      ctx.lineTo(rifleEndX, rifleEndY);
+      ctx.stroke();
+
+      ctx.strokeStyle = style.rifleAccent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(rifleStartX + cos * 4.8, rifleStartY + sin * 4.8);
+      ctx.lineTo(rifleStartX + cos * 7.5, rifleStartY + sin * 7.5);
+      ctx.stroke();
+
+      ctx.strokeStyle = style.rifleTip;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(rifleEndX - cos * 3.6, rifleEndY - sin * 3.6);
+      ctx.lineTo(rifleEndX, rifleEndY);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(68,37,17,0.9)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(-0.2, -0.2, 1.4, 0.3, 2.3);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawMonkey(monkey, ghost = false, valid = true) {
+      const type = getMonkeyType(monkey.typeId);
+      if (!type) return;
+      if (type.id === "dart") {
+        drawDartMonkey(monkey, ghost, valid);
+        return;
+      }
+      if (type.id === "sniper") {
+        drawSniperMonkey(monkey, ghost, valid);
+        return;
+      }
+
+      const lookX = monkey.lookX || 0;
+      const lookY = monkey.lookY || 0;
+      const tint = ghost ? (valid ? "rgba(250, 204, 21, 0.78)" : "rgba(239, 68, 68, 0.78)") : type.color;
+
+      ctx.save();
+      ctx.translate(monkey.x, monkey.y);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, 14, 14, 4.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = tint;
+      ctx.beginPath();
+      ctx.ellipse(0, 2.2, 9.4, 8.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = tint;
+      ctx.beginPath();
+      ctx.ellipse(0, -6.5, 12.4, 10.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(-3.8, -10.8, 4.3, 2.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#e2e8f0";
+      ctx.beginPath();
+      ctx.ellipse(-4.3, -5.8, 2.9, 3.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(4.3, -5.8, 2.9, 3.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const pupilX = clamp(lookX, -1.8, 1.8) * 0.65;
+      const pupilY = clamp(lookY, -1.4, 1.4) * 0.65;
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(-4.3 + pupilX, -5.8 + pupilY, 1.1, 0, Math.PI * 2);
+      ctx.arc(4.3 + pupilX, -5.8 + pupilY, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(17,24,39,0.7)";
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.arc(0, -0.1, 1.5, 0, Math.PI);
+      ctx.stroke();
+
+      ctx.strokeStyle = ghost && !valid ? "#ef4444" : type.dartColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(6.8, 2.2);
+      ctx.lineTo(15.2, -3.8);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawMonkeys() {
+      for (const monkey of state.monkeys) {
+        drawMonkey(monkey, false, true);
+        if (state.sidebar.mode === "upgrade" && state.sidebar.selectedPlacedMonkeyId === monkey.id) {
+          ctx.strokeStyle = "rgba(251, 191, 36, 0.9)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(monkey.x, monkey.y, MONKEY_RADIUS + 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawProjectiles() {
+      for (const p of state.projectiles) {
+        const alpha = clamp(p.life / p.maxLife, 0, 1);
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x1, p.y1);
+        ctx.lineTo(p.x2, p.y2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawBalloons() {
+      for (const b of state.balloons) {
+        ctx.fillStyle = b.type === "green" ? "#22c55e" : "#ef4444";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, BALLOON_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.stroke();
+
+        const hpRatio = clamp(b.hp / b.maxHp, 0, 1);
+        ctx.fillStyle = "rgba(2, 6, 23, 0.7)";
+        ctx.fillRect(b.x - 12, b.y - 18, 24, 4);
+        ctx.fillStyle = hpRatio > 0.5 ? "#22c55e" : "#f59e0b";
+        ctx.fillRect(b.x - 12, b.y - 18, 24 * hpRatio, 4);
+
+        if (state.gameTime < b.slowUntil) {
+          ctx.strokeStyle = "#86efac";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, BALLOON_RADIUS + 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawPlacementGhost() {
+      if (!state.selectedMonkeyId || state.phase !== "running") return;
+      const type = getMonkeyType(state.selectedMonkeyId);
+      if (!type) return;
+      const valid = canPlaceMonkey(state.pointer.x, state.pointer.y);
+
+      ctx.strokeStyle = valid ? "rgba(255,255,255,0.35)" : "rgba(239,68,68,0.5)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(state.pointer.x, state.pointer.y, type.range, 0, Math.PI * 2);
+      ctx.stroke();
+
+      drawMonkey({ typeId: type.id, x: state.pointer.x, y: state.pointer.y }, true, valid);
+
+      if (state.pointer.usingKeyboard) {
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(state.pointer.x - 10, state.pointer.y);
+        ctx.lineTo(state.pointer.x + 10, state.pointer.y);
+        ctx.moveTo(state.pointer.x, state.pointer.y - 10);
+        ctx.lineTo(state.pointer.x, state.pointer.y + 10);
+        ctx.stroke();
+      }
+    }
+
+    function drawIntermissionText() {
+      if (!state.intermission.active || state.phase !== "running") return;
+      const left = Math.max(0, Math.ceil(state.intermission.duration - state.intermission.elapsed));
+      ctx.fillStyle = "rgba(2,6,23,0.75)";
+      ctx.fillRect(12, 12, 200, 34);
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "bold 15px Trebuchet MS";
+      ctx.fillText("Intermission: " + left + "s", 22, 34);
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawTrack();
+      drawMonkeys();
+      drawProjectiles();
+      drawBalloons();
+      drawPlacementGhost();
+      drawIntermissionText();
+    }
+
+    function frame(now) {
+      if (!frame.last) frame.last = now;
+      let dt = (now - frame.last) / 1000;
+      frame.last = now;
+      dt = Math.min(dt, 0.05);
+
+      if (state.msgTimeout > 0) {
+        state.msgTimeout -= dt;
+        if (state.msgTimeout <= 0) msgLine.textContent = "";
+      }
+
+      if (state.waveBonus.timer > 0) {
+        state.waveBonus.timer -= dt;
+        if (state.waveBonus.timer <= 0) waveBonusPopup.classList.add("hidden");
+      }
+
+      if (state.phase === "running") {
+        const simDt = dt * state.speed.multiplier;
+        state.gameTime += simDt;
+        updateKeyboardPointer(dt);
+        updateMonkeyLooks(simDt);
+        updateWaves(simDt);
+        updateBalloons(simDt);
+        updateMonkeys(simDt);
+        updateProjectiles(simDt);
+      }
+
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    function updatePointerFromEvent(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      state.pointer.x = clamp(clientX - rect.left, 0, rect.width) * (canvas.width / rect.width);
+      state.pointer.y = clamp(clientY - rect.top, 0, rect.height) * (canvas.height / rect.height);
+      state.pointer.usingKeyboard = false;
+    }
+
+    function resizeCanvas() {
+      const rect = playArea.getBoundingClientRect();
+      canvas.width = Math.max(300, Math.floor(rect.width));
+      canvas.height = Math.max(220, Math.floor(rect.height));
+      rebuildTrackCache();
+    }
+
+    function setupEvents() {
+      window.addEventListener("resize", resizeCanvas);
+
+      canvas.addEventListener("mousemove", (e) => {
+        updatePointerFromEvent(e.clientX, e.clientY);
+      });
+
+      canvas.addEventListener("dblclick", (e) => {
+        if (state.phase !== "running" || !state.selectedMonkeyId) return;
+        updatePointerFromEvent(e.clientX, e.clientY);
+        tryPlaceSelectedMonkey(state.pointer.x, state.pointer.y);
+      });
+
+      canvas.addEventListener("click", (e) => {
+        if (state.phase !== "running" || state.selectedMonkeyId) return;
+        updatePointerFromEvent(e.clientX, e.clientY);
+        const hitMonkey = findMonkeyAtPosition(state.pointer.x, state.pointer.y);
+        if (hitMonkey) {
+          selectPlacedMonkey(hitMonkey.id);
+        } else if (state.sidebar.mode === "upgrade") {
+          state.sidebar.mode = "shop";
+          state.sidebar.selectedPlacedMonkeyId = null;
+          refreshSideBar();
+        }
+      });
+
+      canvas.addEventListener("touchstart", (e) => {
+        if (!e.touches.length) return;
+        const t = e.touches[0];
+        updatePointerFromEvent(t.clientX, t.clientY);
+      }, { passive: false });
+
+      canvas.addEventListener("touchmove", (e) => {
+        if (!e.touches.length) return;
+        const t = e.touches[0];
+        updatePointerFromEvent(t.clientX, t.clientY);
+      }, { passive: false });
+
+      canvas.addEventListener("touchend", () => {
+        if (state.phase !== "running") return;
+        if (state.selectedMonkeyId) {
+          const now = performance.now();
+          const dx = state.pointer.x - state.touchLastTapX;
+          const dy = state.pointer.y - state.touchLastTapY;
+          const near = Math.hypot(dx, dy) < 34;
+          if (now - state.touchLastTapTime < 320 && near) {
+            tryPlaceSelectedMonkey(state.pointer.x, state.pointer.y);
+            state.touchLastTapTime = 0;
+          } else {
+            state.touchLastTapTime = now;
+            state.touchLastTapX = state.pointer.x;
+            state.touchLastTapY = state.pointer.y;
+          }
+          return;
+        }
+
+        const hitMonkey = findMonkeyAtPosition(state.pointer.x, state.pointer.y);
+        if (hitMonkey) {
+          selectPlacedMonkey(hitMonkey.id);
+        } else if (state.sidebar.mode === "upgrade") {
+          state.sidebar.mode = "shop";
+          state.sidebar.selectedPlacedMonkeyId = null;
+          refreshSideBar();
+        }
+      }, { passive: true });
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "1") chooseMonkey("dart");
+        if (e.key === "2") chooseMonkey("glue");
+        if (e.key === "3") chooseMonkey("sniper");
+
+        if (e.key === "Escape") {
+          state.selectedMonkeyId = null;
+          state.sidebar.mode = "shop";
+          state.sidebar.selectedPlacedMonkeyId = null;
+          refreshSideBar();
+        }
+
+        const lower = e.key.toLowerCase();
+        if (["w", "a", "s", "d"].includes(lower)) {
+          state.keys.add(lower);
+          e.preventDefault();
+        }
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          state.keys.add(e.key);
+          e.preventDefault();
+        }
+
+        if (e.key === "Enter" && state.selectedMonkeyId && state.phase === "running") {
+          const now = performance.now();
+          if (now - state.keyboardLastEnterTime < 350) {
+            tryPlaceSelectedMonkey(state.pointer.x, state.pointer.y);
+            state.keyboardLastEnterTime = 0;
+          } else {
+            state.keyboardLastEnterTime = now;
+          }
+        }
+
+        if (e.key.toLowerCase() === " " && state.intermission.active) {
+          e.preventDefault();
+          startWave(state.wave + 1);
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        const lower = e.key.toLowerCase();
+        state.keys.delete(lower);
+        state.keys.delete(e.key);
+      });
+
+      $("startBtn").addEventListener("click", () => {
+        startScreen.classList.add("hidden");
+        resetRun();
+      });
+
+      $("restartBtn").addEventListener("click", () => {
+        gameOverScreen.classList.add("hidden");
+        resetRun();
+      });
+
+      $("backToStartBtn").addEventListener("click", () => {
+        gameOverScreen.classList.add("hidden");
+        state.phase = "start";
+        startScreen.classList.remove("hidden");
+      });
+
+      $("skipBreakBtn").addEventListener("click", () => {
+        if (state.phase === "running" && state.intermission.active) {
+          startWave(state.wave + 1);
+        }
+      });
+
+      $("keepBreakBtn").addEventListener("click", () => {
+        intermissionPopup.classList.add("hidden");
+      });
+
+      speedBtn.addEventListener("click", () => {
+        const currentIdx = SPEED_LEVELS.indexOf(state.speed.multiplier);
+        const nextIdx = (currentIdx + 1) % SPEED_LEVELS.length;
+        state.speed.multiplier = SPEED_LEVELS[nextIdx];
+        refreshSpeedButton();
+        setMessage("Speed set to " + state.speed.multiplier + "x.");
+      });
+    }
+
+    function boot() {
+      buildTrackButtons();
+      refreshSideBar();
+      refreshHud();
+      setupEvents();
+      resizeCanvas();
+      requestAnimationFrame(frame);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
