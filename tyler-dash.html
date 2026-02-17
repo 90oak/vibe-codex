@@ -352,30 +352,38 @@
       .spike::before {
         content: "";
         position: absolute;
-        width: 88%;
-        height: 130%;
-        left: 6%;
-        bottom: 44%;
+        width: 16%;
+        height: 136%;
+        left: 50%;
+        bottom: 40%;
+        translate: -50% 0;
         transform: rotate(-26deg);
-        transform-origin: 20% 100%;
+        transform-origin: 50% 100%;
         background:
-          linear-gradient(90deg, transparent 0 12%, #dbe0e6 12% 20%, transparent 20% 40%, #dbe0e6 40% 48%, transparent 48% 68%, #dbe0e6 68% 76%, transparent 76% 100%),
-          linear-gradient(180deg, transparent 0 16%, #8e5a2a 16% 28%, transparent 28% 100%),
-          linear-gradient(180deg, #a46b33 0%, #74481f 100%);
-        background-size: 66% 40%, 66% 28%, 14% 100%;
-        background-position: 2% 0, 2% 18%, 66% 0;
-        background-repeat: no-repeat;
+          linear-gradient(180deg, #b57a3f 0%, #7b4f26 54%, #633d1e 100%);
+        border-radius: 8px;
+        box-shadow: inset 0 0 0 1px rgba(255, 223, 163, 0.32);
       }
 
       .spike::after {
         content: "";
         position: absolute;
-        inset: -10px -8px auto;
-        height: 18px;
+        width: 116%;
+        height: 136%;
+        left: 50%;
+        bottom: 40%;
+        translate: -50% 0;
+        transform: rotate(-26deg);
+        transform-origin: 50% 100%;
         background:
-          linear-gradient(62deg, transparent 0 35%, #f5dfad 35% 48%, transparent 48% 100%),
-          linear-gradient(124deg, transparent 0 44%, #ead3a0 44% 56%, transparent 56% 100%),
-          linear-gradient(88deg, transparent 0 40%, #dcb57d 40% 52%, transparent 52% 100%);
+          linear-gradient(180deg, #d4e2f2 0%, #9fb5cb 100%),
+          linear-gradient(180deg, #d4e2f2 0%, #9fb5cb 100%),
+          linear-gradient(180deg, #d4e2f2 0%, #9fb5cb 100%),
+          linear-gradient(180deg, #ccb179 0%, #a78146 100%);
+        background-size: 8% 27%, 8% 20%, 8% 27%, 74% 12%;
+        background-position: 72% 14%, 72% 23%, 72% 32%, 50% 29%;
+        background-repeat: no-repeat;
+        border-radius: 8px;
         pointer-events: none;
       }
 
