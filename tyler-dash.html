@@ -201,6 +201,38 @@
         opacity: 0.75;
       }
 
+      .swamp-transition {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .game-shell.is-transitioning .swamp-transition {
+        opacity: 1;
+      }
+
+      .swamp-transition-sweep {
+        position: absolute;
+        inset: 0;
+        width: 170%;
+        transform: translateX(var(--transition-sweep-x, 100%));
+        background:
+          linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0) 0%,
+            rgba(18, 45, 36, 0.25) 20%,
+            rgba(27, 64, 50, 0.55) 36%,
+            #000000 52%,
+            #000000 56%,
+            rgba(51, 94, 73, 0.78) 68%,
+            rgba(73, 120, 93, 0.96) 84%,
+            rgba(91, 137, 109, 1) 100%
+          );
+      }
+
       .cloud-layer {
         position: absolute;
         inset: 0;
@@ -284,6 +316,15 @@
         overflow: hidden;
       }
 
+      .square.is-swamp {
+        background:
+          repeating-linear-gradient(0deg, rgba(165, 236, 149, 0.98) 0 6px, rgba(127, 204, 108, 0.98) 6px 12px),
+          repeating-linear-gradient(90deg, rgba(56, 118, 63, 0.42) 0 2px, rgba(175, 236, 160, 0.28) 2px 10px),
+          linear-gradient(145deg, #c5f6b6 0%, #95da79 55%, #4f8f52 100%);
+        border-color: #376d3f;
+        box-shadow: 0 0 0 2px #c4f7bb, 0 18px 30px rgba(33, 87, 41, 0.42);
+      }
+
       .square-face {
         position: absolute;
         inset: 0;
@@ -316,6 +357,57 @@
         height: clamp(5px, 1vw, 8px);
         background: #77421b;
         border: 1px solid rgba(255, 235, 184, 0.45);
+      }
+
+      .square.is-swamp .square-eye {
+        background: #24502b;
+        border-color: rgba(223, 255, 219, 0.4);
+      }
+
+      .square.is-swamp .square-mouth {
+        background: #2c6434;
+        border-color: rgba(223, 255, 219, 0.45);
+      }
+
+      .square-vines {
+        position: absolute;
+        inset: -8px;
+        opacity: 0;
+        transition: opacity 0.16s ease;
+        pointer-events: none;
+      }
+
+      .square.is-swamp .square-vines {
+        opacity: 1;
+      }
+
+      .vine {
+        position: absolute;
+        width: 11px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #3f8f4a 0%, #23572b 100%);
+        box-shadow: 0 0 0 1px rgba(190, 245, 182, 0.35);
+      }
+
+      .vine--top {
+        height: 26px;
+        left: 26%;
+        top: -6px;
+        transform: rotate(-20deg);
+      }
+
+      .vine--right {
+        height: 30px;
+        right: -6px;
+        top: 42%;
+        transform: rotate(28deg);
+      }
+
+      .vine--left {
+        height: 23px;
+        left: -8px;
+        top: 55%;
+        transform: rotate(-34deg);
       }
 
       .cube {
@@ -472,6 +564,31 @@
         animation-play-state: paused;
       }
 
+      .game-shell.area-swamp {
+        background: linear-gradient(180deg, rgba(12, 25, 20, 0.92) 0%, rgba(9, 19, 16, 0.97) 50%, rgba(6, 13, 10, 1) 100%);
+      }
+
+      .game-shell.area-swamp .sky {
+        background:
+          linear-gradient(180deg, rgba(111, 150, 126, 0.72) 0%, rgba(87, 126, 105, 0.9) 42%, rgba(74, 112, 92, 0.97) 100%);
+      }
+
+      .game-shell.area-swamp .grass-blade--faded {
+        background: linear-gradient(180deg, #759f74 0%, #4d7f54 100%);
+      }
+
+      .game-shell.area-swamp .grass-blade--bright {
+        background: linear-gradient(180deg, #91c27b 0%, #51915f 55%, #2d5f39 100%);
+      }
+
+      .game-shell.area-swamp .floor {
+        background:
+          repeating-linear-gradient(90deg, rgba(39, 58, 45, 0.45) 0 2px, transparent 2px 32px),
+          repeating-linear-gradient(0deg, rgba(37, 58, 47, 0.35) 0 2px, transparent 2px 32px),
+          linear-gradient(180deg, #4a6348 0%, #39503d 52%, #2a3d30 100%);
+        border-top-color: rgba(125, 168, 132, 0.9);
+      }
+
       .floor::after {
         content: "";
         position: absolute;
@@ -603,12 +720,20 @@
       <div class="sky" aria-hidden="true">
         <div class="cloud-layer" id="cloudLayer"></div>
       </div>
+      <div class="swamp-transition" id="swampTransition" aria-hidden="true">
+        <div class="swamp-transition-sweep"></div>
+      </div>
       <div class="lane">
         <div class="square" id="square">
           <div class="square-face" aria-hidden="true">
             <span class="square-eye square-eye--left"></span>
             <span class="square-eye square-eye--right"></span>
             <span class="square-mouth"></span>
+          </div>
+          <div class="square-vines" aria-hidden="true">
+            <span class="vine vine--top"></span>
+            <span class="vine vine--right"></span>
+            <span class="vine vine--left"></span>
           </div>
         </div>
       </div>
@@ -648,6 +773,8 @@
         platform: null,
         fallingFrom: null,
         score: 0,
+        area: "meadow",
+        transitionProgress: 0,
       };
 
       const gravity = -0.9;
@@ -667,6 +794,12 @@
       const cloudSpeed = obstacleSpeed * 0.34;
       const cloudSpawnIntervalMs = 1650;
       const cloudSpawnPadding = 120;
+      const swampScoreThreshold = 15;
+      const swampTransitionDurationMs = 3200;
+      const transitionSweepTravel = 180;
+      const transitionBlackStart = 0.52;
+      const transitionBlackEnd = 0.56;
+      const transitionOverlayWidthRatio = 1.7;
       const squareBackEdgeX = () => {
         const squareRect = square.getBoundingClientRect();
         return squareRect.left + squareRect.width * 0.5;
@@ -717,6 +850,8 @@
         state.platform = null;
         state.fallingFrom = null;
         state.score = 0;
+        state.area = "meadow";
+        state.transitionProgress = 0;
         obstacleTimer = 0;
         grassSpawnTimer = 0;
         grassSwayTimer = 0;
@@ -726,7 +861,47 @@
         clouds.splice(0).forEach((cloud) => cloud.element.remove());
         gameMessage.classList.remove("is-visible");
         game.classList.remove("is-paused");
+        game.classList.remove("is-transitioning", "area-swamp");
+        square.classList.remove("is-swamp");
+        game.style.setProperty("--transition-sweep-x", "100%");
         updateScore();
+      };
+
+      const beginSwampTransition = () => {
+        if (state.area !== "meadow") {
+          return;
+        }
+        state.area = "transition";
+        state.transitionProgress = 0;
+        game.classList.add("is-transitioning");
+      };
+
+      const updateSwampTransition = (delta, squareRect) => {
+        if (state.area !== "transition") {
+          return;
+        }
+
+        state.transitionProgress = Math.min(state.transitionProgress + (delta * 1000) / swampTransitionDurationMs, 1);
+        const sweepX = 100 - transitionSweepTravel * state.transitionProgress;
+        game.style.setProperty("--transition-sweep-x", `${sweepX}%`);
+
+        const gameRect = game.getBoundingClientRect();
+        const overlayWidth = gameRect.width * transitionOverlayWidthRatio;
+        const overlayLeft = gameRect.left + (sweepX / 100) * overlayWidth;
+        const blackLeft = overlayLeft + overlayWidth * transitionBlackStart;
+        const blackRight = overlayLeft + overlayWidth * transitionBlackEnd;
+        const squareCenter = squareRect.left + squareRect.width * 0.5;
+
+        if (squareCenter >= blackLeft && squareCenter <= blackRight) {
+          square.classList.add("is-swamp");
+        }
+
+        if (state.transitionProgress >= 1) {
+          state.area = "swamp";
+          game.classList.remove("is-transitioning");
+          game.classList.add("area-swamp");
+          square.classList.add("is-swamp");
+        }
       };
 
       const createCloudShape = () => {
@@ -1010,6 +1185,9 @@
               if (state.y > 0) {
                 state.score += 1;
                 updateScore();
+                if (state.score >= swampScoreThreshold) {
+                  beginSwampTransition();
+                }
               }
               obstacle.dataset.scored = "true";
             }
@@ -1070,6 +1248,8 @@
             state.rotationTarget = state.rotation + 90;
             state.rotationFrames = calculateFallFrames(state.y);
           }
+
+          updateSwampTransition(delta, squareRect);
         }
 
         requestAnimationFrame(update);
