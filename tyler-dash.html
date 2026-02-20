@@ -316,6 +316,7 @@
         width: var(--tree-size, 120px);
         height: calc(var(--tree-size, 120px) * 1.55);
         opacity: var(--tree-opacity, 0.2);
+        left: 0;
         transform: translateX(-50%);
         filter: blur(0.4px);
       }
@@ -467,7 +468,7 @@
 
       .square-vines {
         position: absolute;
-        inset: -8px;
+        inset: 8px;
         opacity: 0;
         transition: opacity 0.16s ease;
         pointer-events: none;
@@ -479,11 +480,12 @@
 
       .vine {
         position: absolute;
-        width: 11px;
-        height: 24px;
+        width: 10px;
+        height: 26px;
         border-radius: 999px;
         background: linear-gradient(180deg, #3f8f4a 0%, #23572b 100%);
         box-shadow: 0 0 0 1px rgba(190, 245, 182, 0.35);
+        opacity: 0.92;
       }
 
       .vine::after {
@@ -499,73 +501,66 @@
       }
 
       .vine--top {
-        height: 26px;
         left: 26%;
-        top: -6px;
-        transform: rotate(-20deg);
+        top: 8%;
+        transform: rotate(-26deg);
       }
 
       .vine--right {
-        height: 30px;
-        right: -6px;
-        top: 42%;
-        transform: rotate(28deg);
+        right: 24%;
+        top: 30%;
+        transform: rotate(30deg);
       }
 
       .vine--left {
-        height: 23px;
-        left: -8px;
-        top: 55%;
-        transform: rotate(-34deg);
-      }
-
-      .vine--top-right {
-        height: 28px;
-        top: -8px;
-        left: 56%;
-        transform: rotate(22deg);
-      }
-
-      .vine--top-left {
-        height: 20px;
-        top: -8px;
-        left: 8%;
+        left: 16%;
+        top: 44%;
         transform: rotate(-38deg);
       }
 
-      .vine--mid-right {
+      .vine--top-right {
+        top: 10%;
+        left: 62%;
+        transform: rotate(24deg);
+      }
+
+      .vine--top-left {
         height: 22px;
-        right: 4px;
-        top: 20%;
+        top: 16%;
+        left: 6%;
+        transform: rotate(-44deg);
+      }
+
+      .vine--mid-right {
+        right: 8%;
+        top: 42%;
         transform: rotate(42deg);
       }
 
       .vine--mid-left {
-        height: 25px;
-        left: 2px;
-        top: 26%;
-        transform: rotate(-40deg);
+        height: 22px;
+        left: 30%;
+        top: 28%;
+        transform: rotate(-18deg);
       }
 
       .vine--bottom {
-        height: 22px;
         left: 46%;
-        bottom: -8px;
-        transform: rotate(12deg);
+        bottom: 8%;
+        transform: rotate(10deg);
       }
 
       .vine--bottom-left {
-        height: 19px;
+        height: 21px;
         left: 18%;
-        bottom: -7px;
-        transform: rotate(-20deg);
+        bottom: 10%;
+        transform: rotate(-22deg);
       }
 
       .vine--bottom-right {
-        height: 24px;
-        right: 14%;
-        bottom: -8px;
-        transform: rotate(30deg);
+        right: 16%;
+        bottom: 12%;
+        transform: rotate(28deg);
       }
 
       .cube {
@@ -965,6 +960,7 @@
       const retryButton = document.getElementById("retryButton");
       const grassField = document.getElementById("grassField");
       const cloudLayer = document.getElementById("cloudLayer");
+      const swampTreeLayer = game.querySelector(".swamp-tree-layer");
 
       const state = {
         y: 0,
@@ -1000,7 +996,9 @@
       const grassSpawnIntervalMs = 180;
       const grassSwayIntervalMs = 2400;
       const clouds = [];
+      const swampTrees = [];
       const cloudSpeed = obstacleSpeed * 0.34;
+      const swampTreeSpeed = obstacleSpeed * 0.18;
       const cloudSpawnIntervalMs = 1650;
       const cloudSpawnPadding = 120;
       const swampScoreThreshold = 15;
@@ -1019,6 +1017,27 @@
       let grassSpawnTimer = 0;
       let grassSwayTimer = 0;
       let cloudSpawnTimer = 0;
+
+      const initializeSwampTrees = () => {
+        if (!swampTreeLayer) {
+          return;
+        }
+
+        const skyRect = swampTreeLayer.getBoundingClientRect();
+        const treeElements = [...swampTreeLayer.querySelectorAll(".swamp-tree")];
+
+        swampTrees.splice(0);
+        treeElements.forEach((tree) => {
+          const treeRect = tree.getBoundingClientRect();
+          const x = treeRect.left - skyRect.left + treeRect.width * 0.5;
+          tree.style.left = `${x}px`;
+          swampTrees.push({
+            element: tree,
+            x,
+            width: treeRect.width,
+          });
+        });
+      };
 
       const spawnObstacle = () => {
         const obstacle = document.createElement("div");
@@ -1073,6 +1092,7 @@
         game.classList.remove("is-transitioning", "area-swamp");
         square.classList.remove("is-swamp");
         game.style.setProperty("--transition-sweep-x", "100%");
+        initializeSwampTrees();
         updateScore();
       };
 
@@ -1110,6 +1130,29 @@
           game.classList.remove("is-transitioning");
           game.classList.add("area-swamp");
           square.classList.add("is-swamp");
+        }
+      };
+
+      const updateSwampTrees = (delta) => {
+        if (!swampTreeLayer || !swampTrees.length || state.area === "meadow") {
+          return;
+        }
+
+        const layerWidth = swampTreeLayer.clientWidth;
+        for (let i = 0; i < swampTrees.length; i += 1) {
+          const tree = swampTrees[i];
+          tree.x -= swampTreeSpeed * delta;
+
+          if (tree.x < -tree.width * 0.5) {
+            const rightmostX = Math.max(...swampTrees.map((item) => item.x));
+            tree.x = rightmostX + tree.width * (0.65 + Math.random() * 0.25);
+          }
+
+          if (tree.x > layerWidth + tree.width) {
+            tree.x = layerWidth + tree.width * 0.4;
+          }
+
+          tree.element.style.left = `${tree.x}px`;
         }
       };
 
@@ -1368,6 +1411,8 @@
             }
           }
 
+          updateSwampTrees(delta);
+
           if (obstacleTimer >= obstacleIntervalMs) {
             obstacleTimer = 0;
             spawnObstacle();
@@ -1540,6 +1585,7 @@
         resetGame();
       });
 
+      initializeSwampTrees();
       requestAnimationFrame(update);
     </script>
   </body>
