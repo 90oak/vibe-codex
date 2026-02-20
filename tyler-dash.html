@@ -233,35 +233,96 @@
           );
       }
 
-      .swamp-transition-sweep::before {
-        content: "";
+      .transition-tree {
         position: absolute;
-        width: clamp(130px, 16vw, 190px);
-        height: clamp(180px, 32vh, 280px);
-        left: 52%;
-        bottom: calc(var(--floor-top) - 10px);
+        width: clamp(120px, 16vw, 190px);
+        height: clamp(190px, 34vh, 300px);
+        left: 54%;
+        bottom: calc(var(--floor-top) - 4px);
         transform: translateX(-50%);
-        background:
-          radial-gradient(ellipse at 50% 18%, rgba(8, 20, 15, 0.95) 0 54%, rgba(8, 20, 15, 0) 70%),
-          radial-gradient(ellipse at 24% 30%, rgba(8, 20, 15, 0.95) 0 48%, rgba(8, 20, 15, 0) 68%),
-          radial-gradient(ellipse at 78% 30%, rgba(8, 20, 15, 0.95) 0 48%, rgba(8, 20, 15, 0) 68%),
-          linear-gradient(180deg, rgba(12, 26, 20, 0) 0 45%, rgba(12, 26, 20, 0.94) 45% 100%);
-        filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.5));
+        z-index: 2;
+        filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.55));
       }
 
-      .swamp-transition-sweep::after {
-        content: "";
+      .transition-tree-trunk {
         position: absolute;
-        width: clamp(82px, 9vw, 120px);
-        height: clamp(120px, 22vh, 178px);
-        left: 52%;
-        bottom: calc(var(--floor-top) - 10px);
+        left: 50%;
+        bottom: 0;
+        width: 24%;
+        height: 63%;
         transform: translateX(-50%);
-        background:
-          linear-gradient(180deg, rgba(15, 30, 23, 0) 0 22%, rgba(13, 28, 21, 0.92) 22% 100%),
-          linear-gradient(120deg, rgba(11, 23, 18, 0) 38%, rgba(11, 23, 18, 0.9) 40% 58%, rgba(11, 23, 18, 0) 60%),
-          linear-gradient(235deg, rgba(11, 23, 18, 0) 34%, rgba(11, 23, 18, 0.88) 36% 54%, rgba(11, 23, 18, 0) 56%);
-        clip-path: polygon(41% 0, 60% 0, 67% 14%, 77% 30%, 66% 30%, 84% 57%, 69% 57%, 69% 100%, 31% 100%, 31% 57%, 16% 57%, 34% 30%, 23% 30%, 33% 14%);
+        background: rgba(9, 12, 11, 0.95);
+        clip-path: polygon(37% 0, 64% 0, 74% 12%, 70% 30%, 76% 45%, 71% 59%, 74% 76%, 66% 100%, 36% 100%, 28% 74%, 32% 55%, 28% 40%, 32% 20%);
+      }
+
+      .transition-tree-branch {
+        position: absolute;
+        height: clamp(9px, 1.4vw, 15px);
+        border-radius: 999px;
+        background: rgba(9, 12, 11, 0.95);
+        transform-origin: 0 50%;
+      }
+
+      .transition-tree-branch--left-main {
+        width: 44%;
+        top: 38%;
+        left: 50%;
+        transform: rotate(-152deg);
+      }
+
+      .transition-tree-branch--right-main {
+        width: 39%;
+        top: 43%;
+        left: 53%;
+        transform: rotate(-16deg);
+      }
+
+      .transition-tree-branch--top {
+        width: 32%;
+        top: 24%;
+        left: 50%;
+        transform: rotate(-94deg);
+      }
+
+      .transition-tree-branch--left-small {
+        width: 23%;
+        top: 30%;
+        left: 45%;
+        transform: rotate(-138deg);
+      }
+
+      .transition-tree-branch--right-small {
+        width: 19%;
+        top: 31%;
+        left: 57%;
+        transform: rotate(-35deg);
+      }
+
+      .swamp-tree-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 1s ease;
+      }
+
+      .game-shell.area-swamp .swamp-tree-layer {
+        opacity: 1;
+      }
+
+      .swamp-tree {
+        position: absolute;
+        bottom: calc(var(--floor-top) - 8px);
+        width: var(--tree-size, 120px);
+        height: calc(var(--tree-size, 120px) * 1.55);
+        opacity: var(--tree-opacity, 0.2);
+        transform: translateX(-50%);
+        filter: blur(0.4px);
+      }
+
+      .swamp-tree .transition-tree-trunk,
+      .swamp-tree .transition-tree-branch {
+        background: rgba(10, 20, 16, 0.85);
       }
 
       .cloud-layer {
@@ -661,37 +722,13 @@
         animation-play-state: paused;
       }
 
-      .game-shell.area-swamp {
-        background: linear-gradient(180deg, rgba(12, 25, 20, 0.92) 0%, rgba(9, 19, 16, 0.97) 50%, rgba(6, 13, 10, 1) 100%);
-      }
-
-      .game-shell,
-      .sky,
-      .floor,
-      .grass-blade--faded,
-      .grass-blade--bright {
-        transition: background 1.15s ease, border-top-color 1.15s ease;
+      .sky {
+        transition: background 1.15s ease;
       }
 
       .game-shell.area-swamp .sky {
         background:
           linear-gradient(180deg, rgba(111, 150, 126, 0.72) 0%, rgba(87, 126, 105, 0.9) 42%, rgba(74, 112, 92, 0.97) 100%);
-      }
-
-      .game-shell.area-swamp .grass-blade--faded {
-        background: linear-gradient(180deg, #759f74 0%, #4d7f54 100%);
-      }
-
-      .game-shell.area-swamp .grass-blade--bright {
-        background: linear-gradient(180deg, #91c27b 0%, #51915f 55%, #2d5f39 100%);
-      }
-
-      .game-shell.area-swamp .floor {
-        background:
-          repeating-linear-gradient(90deg, rgba(39, 58, 45, 0.45) 0 2px, transparent 2px 32px),
-          repeating-linear-gradient(0deg, rgba(37, 58, 47, 0.35) 0 2px, transparent 2px 32px),
-          linear-gradient(180deg, #4a6348 0%, #39503d 52%, #2a3d30 100%);
-        border-top-color: rgba(125, 168, 132, 0.9);
       }
 
       .floor::after {
@@ -832,10 +869,61 @@
         </div>
       </div>
       <div class="sky" aria-hidden="true">
+        <div class="swamp-tree-layer" aria-hidden="true">
+          <div class="swamp-tree" style="left: 18%; --tree-size: 84px; --tree-opacity: 0.12;">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+          <div class="swamp-tree" style="left: 36%; --tree-size: 112px; --tree-opacity: 0.2;">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+          <div class="swamp-tree" style="left: 54%; --tree-size: 74px; --tree-opacity: 0.1;">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+          <div class="swamp-tree" style="left: 68%; --tree-size: 136px; --tree-opacity: 0.23;">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+          <div class="swamp-tree" style="left: 82%; --tree-size: 94px; --tree-opacity: 0.15;">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+        </div>
         <div class="cloud-layer" id="cloudLayer"></div>
       </div>
       <div class="swamp-transition" id="swampTransition" aria-hidden="true">
-        <div class="swamp-transition-sweep"></div>
+        <div class="swamp-transition-sweep">
+          <div class="transition-tree" aria-hidden="true">
+            <span class="transition-tree-trunk"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-main"></span>
+            <span class="transition-tree-branch transition-tree-branch--top"></span>
+            <span class="transition-tree-branch transition-tree-branch--left-small"></span>
+            <span class="transition-tree-branch transition-tree-branch--right-small"></span>
+          </div>
+        </div>
       </div>
       <div class="lane">
         <div class="square" id="square">
