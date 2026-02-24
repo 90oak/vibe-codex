@@ -261,41 +261,53 @@
         border-radius: 999px;
         background: rgba(9, 12, 11, 0.95);
         transform-origin: 0 50%;
+        transform: rotate(var(--branch-angle, 0deg));
+        animation: tree-branch-sway var(--branch-sway-duration, 3.1s) ease-in-out infinite;
+        animation-delay: var(--branch-sway-delay, 0s);
       }
 
       .transition-tree-branch--left-main {
         width: 44%;
         top: 38%;
         left: 50%;
-        transform: rotate(-152deg);
+        --branch-angle: -152deg;
       }
 
       .transition-tree-branch--right-main {
         width: 39%;
         top: 43%;
         left: 53%;
-        transform: rotate(-16deg);
+        --branch-angle: -16deg;
       }
 
       .transition-tree-branch--top {
         width: 32%;
         top: 24%;
         left: 50%;
-        transform: rotate(-94deg);
+        --branch-angle: -94deg;
       }
 
       .transition-tree-branch--left-small {
         width: 23%;
         top: 30%;
         left: 45%;
-        transform: rotate(-138deg);
+        --branch-angle: -138deg;
       }
 
       .transition-tree-branch--right-small {
         width: 19%;
         top: 31%;
         left: 57%;
-        transform: rotate(-35deg);
+        --branch-angle: -35deg;
+      }
+
+      .swamp-tree:nth-child(odd) .transition-tree-branch {
+        --branch-sway-duration: 2.8s;
+      }
+
+      .swamp-tree:nth-child(3n) .transition-tree-branch {
+        --branch-sway-duration: 3.5s;
+        --branch-sway-delay: -0.6s;
       }
 
       .swamp-tree-layer {
@@ -833,6 +845,16 @@
         }
       }
 
+      @keyframes tree-branch-sway {
+        0%,
+        100% {
+          transform: rotate(calc(var(--branch-angle, 0deg) - 2deg));
+        }
+        50% {
+          transform: rotate(calc(var(--branch-angle, 0deg) + 2deg));
+        }
+      }
+
       @media (max-width: 600px) {
         .game-shell {
           border-radius: 0;
@@ -986,21 +1008,24 @@
       const jumpVelocity = 16.05;
       const totalAirFrames = Math.ceil((2 * jumpVelocity) / -gravity);
       const obstacleIntervalMs = 3000;
-      const obstacleSpeed = 480;
+      const obstacleBaseSpeed = 480;
       const obstaclePadding = 24;
       const obstacles = [];
       const obstacleTypes = ["spike", "cube"];
       const grassBlades = [];
       const grassSpawnPadding = 20;
-      const grassSpeed = obstacleSpeed * 0.72;
+      const grassSpeedMultiplier = 0.72;
       const grassSpawnIntervalMs = 180;
       const grassSwayIntervalMs = 2400;
       const clouds = [];
       const swampTrees = [];
-      const cloudSpeed = obstacleSpeed * 0.34;
-      const swampTreeSpeed = obstacleSpeed * 0.18;
+      const cloudSpeedMultiplier = 0.34;
+      const swampTreeSpeedMultiplier = 0.15;
       const cloudSpawnIntervalMs = 1650;
       const cloudSpawnPadding = 120;
+      const scoreSpeedStep = 3;
+      const scoreSpeedMultiplierStep = 1.5;
+      const maxSpeedMultiplier = 4;
       const swampScoreThreshold = 15;
       const swampTransitionDurationMs = 4600;
       const transitionSweepTravel = 180;
@@ -1035,8 +1060,14 @@
             element: tree,
             x,
             width: treeRect.width,
+            speedFactor: 0.75 + Math.random() * 0.45,
           });
         });
+      };
+
+      const getSpeedMultiplier = () => {
+        const level = Math.floor(state.score / scoreSpeedStep);
+        return Math.min(maxSpeedMultiplier, Math.pow(scoreSpeedMultiplierStep, level));
       };
 
       const spawnObstacle = () => {
@@ -1141,7 +1172,8 @@
         const layerWidth = swampTreeLayer.clientWidth;
         for (let i = 0; i < swampTrees.length; i += 1) {
           const tree = swampTrees[i];
-          tree.x -= swampTreeSpeed * delta;
+          const treeSpeed = obstacleBaseSpeed * swampTreeSpeedMultiplier * tree.speedFactor * getSpeedMultiplier();
+          tree.x -= treeSpeed * delta;
 
           if (tree.x < -tree.width * 0.5) {
             const rightmostX = Math.max(...swampTrees.map((item) => item.x));
@@ -1376,6 +1408,7 @@
           const squarePassX = squareBackEdgeX();
           for (let i = grassBlades.length - 1; i >= 0; i -= 1) {
             const blade = grassBlades[i];
+            const grassSpeed = obstacleBaseSpeed * grassSpeedMultiplier * getSpeedMultiplier();
             blade.x -= grassSpeed * delta;
             blade.element.style.left = `${blade.x}px`;
 
@@ -1402,6 +1435,7 @@
 
           for (let i = clouds.length - 1; i >= 0; i -= 1) {
             const cloud = clouds[i];
+            const cloudSpeed = obstacleBaseSpeed * cloudSpeedMultiplier;
             cloud.x -= cloudSpeed * delta;
             cloud.element.style.transform = `translate(${cloud.x}px, ${cloud.y}px)`;
 
@@ -1424,6 +1458,7 @@
           for (let i = obstacles.length - 1; i >= 0; i -= 1) {
             const obstacle = obstacles[i];
             const currentX = Number(obstacle.dataset.x || 0);
+            const obstacleSpeed = obstacleBaseSpeed * getSpeedMultiplier();
             const nextX = currentX - obstacleSpeed * delta;
             obstacle.dataset.x = nextX.toString();
             obstacle.style.transform = `translateX(${nextX}px)`;
