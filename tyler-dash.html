@@ -235,8 +235,8 @@
 
       .transition-tree {
         position: absolute;
-        width: clamp(120px, 16vw, 190px);
-        height: clamp(190px, 34vh, 300px);
+        width: clamp(168px, 24vw, 280px);
+        height: clamp(248px, 42vh, 380px);
         left: 54%;
         bottom: calc(var(--floor-top) - 4px);
         transform: translateX(-50%);
@@ -248,8 +248,8 @@
         position: absolute;
         left: 50%;
         bottom: 0;
-        width: 24%;
-        height: 63%;
+        width: 34%;
+        height: 69%;
         transform: translateX(-50%);
         background: rgba(9, 12, 11, 0.95);
         clip-path: polygon(37% 0, 64% 0, 74% 12%, 70% 30%, 76% 45%, 71% 59%, 74% 76%, 66% 100%, 36% 100%, 28% 74%, 32% 55%, 28% 40%, 32% 20%);
@@ -419,6 +419,11 @@
         transform: translateY(0);
         transform-origin: center;
         overflow: hidden;
+        transition: opacity 0.08s linear;
+      }
+
+      .square.is-behind-transition-tree {
+        opacity: 0;
       }
 
       .square.is-swamp {
@@ -983,6 +988,7 @@
       const grassField = document.getElementById("grassField");
       const cloudLayer = document.getElementById("cloudLayer");
       const swampTreeLayer = game.querySelector(".swamp-tree-layer");
+      const transitionTree = game.querySelector(".transition-tree");
 
       const state = {
         y: 0,
@@ -1027,7 +1033,7 @@
       const scoreSpeedMultiplierStep = 1.5;
       const maxSpeedMultiplier = 2;
       const swampScoreThreshold = 15;
-      const swampTransitionDurationMs = 4600;
+      const swampTransitionDurationMs = 3200;
       const transitionSweepTravel = 180;
       const transitionBlackStart = 0.42;
       const transitionBlackEnd = 0.66;
@@ -1122,6 +1128,7 @@
         game.classList.remove("is-paused");
         game.classList.remove("is-transitioning", "area-swamp");
         square.classList.remove("is-swamp");
+        square.classList.remove("is-behind-transition-tree");
         game.style.setProperty("--transition-sweep-x", "100%");
         initializeSwampTrees();
         updateScore();
@@ -1156,11 +1163,21 @@
           square.classList.add("is-swamp");
         }
 
+        if (transitionTree) {
+          const treeRect = transitionTree.getBoundingClientRect();
+          const halfSquare = squareRect.width * 0.5;
+          const canFullyHideInTree =
+            squareCenter >= treeRect.left + halfSquare &&
+            squareCenter <= treeRect.right - halfSquare;
+          square.classList.toggle("is-behind-transition-tree", canFullyHideInTree);
+        }
+
         if (state.transitionProgress >= 1) {
           state.area = "swamp";
           game.classList.remove("is-transitioning");
           game.classList.add("area-swamp");
           square.classList.add("is-swamp");
+          square.classList.remove("is-behind-transition-tree");
         }
       };
 
