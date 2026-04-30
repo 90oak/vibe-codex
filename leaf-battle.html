@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaf Defender</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: "Trebuchet MS", sans-serif;
+        background: radial-gradient(circle at 20% 10%, #27482b 0%, #122015 55%, #090f0a 100%);
+      }
+      .game-shell {
+        width: min(980px, 96vw);
+        aspect-ratio: 16 / 9;
+        border: 2px solid #8fd19655;
+        border-radius: 18px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(#6fb867 0%, #4f9347 35%, #2e5f2f 100%);
+      }
+      #gameCanvas { width: 100%; height: 100%; display: block; }
+      .hud {
+        position: absolute; inset: 14px 16px auto;
+        display: flex; justify-content: space-between; align-items: center;
+        font-weight: 700; letter-spacing: 0.04em;
+        color: #f2ffe3; text-shadow: 0 2px 4px #000a;
+        pointer-events: none;
+      }
+      .message {
+        position: absolute; inset: 0;
+        display: grid; place-items: center;
+        background: #0008; color: #f6ffe9;
+        opacity: 0; pointer-events: none;
+        transition: opacity 180ms ease;
+        text-align: center; padding: 16px;
+      }
+      .message.show { opacity: 1; pointer-events: auto; }
+      button {
+        margin-top: 10px; border: 0; border-radius: 999px;
+        padding: 10px 16px; font-weight: 700; cursor: pointer;
+        background: #d4ff8c; color: #1c2e17;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-shell">
+      <canvas id="gameCanvas" width="960" height="540"></canvas>
+      <div class="hud">
+        <span id="health">Leaf Health: 5</span>
+        <span id="score">Bugs Defeated: 0</span>
+      </div>
+      <div id="message" class="message">
+        <div>
+          <h2>The bugs got your leaf!</h2>
+          <p>Move with WASD / Arrow keys, shoot sap with Space.</p>
+          <button id="restartBtn">Grow a New Leaf</button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const healthLabel = document.getElementById("health");
+      const scoreLabel = document.getElementById("score");
+      const message = document.getElementById("message");
+      const restartBtn = document.getElementById("restartBtn");
+
+      const state = {
+        running: true,
+        score: 0,
+        spawnTimer: 0,
+        keys: new Set(),
+        leaf: { x: canvas.width / 2, y: canvas.height / 2, r: 22, speed: 230, health: 5 },
+        bugs: [],
+        sapShots: [],
+      };
+
+      function resetGame() {
+        state.running = true;
+        state.score = 0;
+        state.spawnTimer = 0;
+        state.bugs = [];
+        state.sapShots = [];
+        state.leaf.x = canvas.width / 2;
+        state.leaf.y = canvas.height / 2;
+        state.leaf.health = 5;
+        healthLabel.textContent = `Leaf Health: ${state.leaf.health}`;
+        scoreLabel.textContent = `Bugs Defeated: ${state.score}`;
+        message.classList.remove("show");
+      }
+
+      function spawnBug() {
+        const side = Math.floor(Math.random() * 4);
+        const speed = 70 + Math.random() * 55 + state.score * 1.8;
+        let x = 0, y = 0;
+        if (side === 0) { x = Math.random() * canvas.width; y = -24; }
+        else if (side === 1) { x = canvas.width + 24; y = Math.random() * canvas.height; }
+        else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 24; }
+        else { x = -24; y = Math.random() * canvas.height; }
+        state.bugs.push({ x, y, r: 14, speed, wiggle: Math.random() * Math.PI * 2 });
+      }
+
+      function shootSap() {
+        if (!state.running) return;
+        const nearest = state.bugs.reduce((best, bug) => {
+          const dx = bug.x - state.leaf.x;
+          const dy = bug.y - state.leaf.y;
+          const d2 = dx * dx + dy * dy;
+          return !best || d2 < best.d2 ? { bug, d2 } : best;
+        }, null);
+        const angle = nearest ? Math.atan2(nearest.bug.y - state.leaf.y, nearest.bug.x - state.leaf.x) : -Math.PI / 2;
+        state.sapShots.push({ x: state.leaf.x, y: state.leaf.y, vx: Math.cos(angle) * 420, vy: Math.sin(angle) * 420, r: 6 });
+      }
+
+      function update(dt) {
+        if (!state.running) return;
+
+        const up = state.keys.has("ArrowUp") || state.keys.has("w");
+        const down = state.keys.has("ArrowDown") || state.keys.has("s");
+        const left = state.keys.has("ArrowLeft") || state.keys.has("a");
+        const right = state.keys.has("ArrowRight") || state.keys.has("d");
+
+        let mx = (right ? 1 : 0) - (left ? 1 : 0);
+        let my = (down ? 1 : 0) - (up ? 1 : 0);
+        const mag = Math.hypot(mx, my) || 1;
+        mx /= mag; my /= mag;
+
+        state.leaf.x = Math.max(state.leaf.r, Math.min(canvas.width - state.leaf.r, state.leaf.x + mx * state.leaf.speed * dt));
+        state.leaf.y = Math.max(state.leaf.r, Math.min(canvas.height - state.leaf.r, state.leaf.y + my * state.leaf.speed * dt));
+
+        state.spawnTimer -= dt;
+        if (state.spawnTimer <= 0) {
+          spawnBug();
+          const floor = Math.max(0.32, 1.15 - state.score * 0.02);
+          state.spawnTimer = floor + Math.random() * 0.45;
+        }
+
+        for (const bug of state.bugs) {
+          const dx = state.leaf.x - bug.x;
+          const dy = state.leaf.y - bug.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          bug.wiggle += dt * 6;
+          const wiggleOffset = Math.sin(bug.wiggle) * 26;
+          bug.x += ((dx / dist) * bug.speed + (dy / dist) * wiggleOffset) * dt;
+          bug.y += ((dy / dist) * bug.speed - (dx / dist) * wiggleOffset) * dt;
+
+          if (dist < state.leaf.r + bug.r) {
+            state.leaf.health -= 1;
+            healthLabel.textContent = `Leaf Health: ${state.leaf.health}`;
+            bug.x = -999;
+            if (state.leaf.health <= 0) {
+              state.running = false;
+              message.classList.add("show");
+            }
+          }
+        }
+
+        state.sapShots = state.sapShots.filter((shot) => {
+          shot.x += shot.vx * dt;
+          shot.y += shot.vy * dt;
+          return shot.x > -20 && shot.x < canvas.width + 20 && shot.y > -20 && shot.y < canvas.height + 20;
+        });
+
+        for (const shot of state.sapShots) {
+          for (const bug of state.bugs) {
+            const dx = shot.x - bug.x;
+            const dy = shot.y - bug.y;
+            if (dx * dx + dy * dy < (shot.r + bug.r) ** 2) {
+              bug.x = -999;
+              shot.x = -999;
+              state.score += 1;
+              scoreLabel.textContent = `Bugs Defeated: ${state.score}`;
+            }
+          }
+        }
+
+        state.bugs = state.bugs.filter((b) => b.x > -200);
+        state.sapShots = state.sapShots.filter((s) => s.x > -200);
+      }
+
+      function drawLeaf() {
+        const { x, y, r } = state.leaf;
+        ctx.fillStyle = "#7cff79";
+        ctx.beginPath();
+        ctx.ellipse(x, y, r * 1.1, r * 0.72, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#2b802c";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.7, y + 4);
+        ctx.lineTo(x + r * 0.74, y - 5);
+        ctx.stroke();
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "#3d7f39";
+        ctx.fillRect(0, canvas.height - 65, canvas.width, 65);
+
+        drawLeaf();
+
+        ctx.fillStyle = "#ffd86b";
+        for (const shot of state.sapShots) {
+          ctx.beginPath();
+          ctx.arc(shot.x, shot.y, shot.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        for (const bug of state.bugs) {
+          ctx.fillStyle = "#3a2222";
+          ctx.beginPath();
+          ctx.arc(bug.x, bug.y, bug.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#130707";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(bug.x - bug.r, bug.y + 4);
+          ctx.lineTo(bug.x + bug.r, bug.y + 4);
+          ctx.stroke();
+        }
+      }
+
+      let last = performance.now();
+      function loop(now) {
+        const dt = Math.min(0.033, (now - last) / 1000);
+        last = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        state.keys.add(key);
+        if (event.code === "Space") {
+          event.preventDefault();
+          shootSap();
+        }
+      });
+
+      window.addEventListener("keyup", (event) => {
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        state.keys.delete(key);
+      });
+
+      canvas.addEventListener("pointerdown", shootSap);
+      restartBtn.addEventListener("click", resetGame);
+
+      resetGame();
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
