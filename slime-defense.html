@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slime Defense</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 20% 10%, #2b3a29, #111a11 60%, #090e09 100%);
+        font-family: "Trebuchet MS", sans-serif;
+      }
+      .shell {
+        width: min(1080px, 96vw);
+        aspect-ratio: 16 / 9;
+        position: relative;
+        border: 2px solid #8cb0ff66;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #1e2c1d;
+      }
+      canvas { width: 100%; height: 100%; display: block; }
+      .hud {
+        position: absolute;
+        inset: 12px 14px auto;
+        display: flex;
+        gap: 16px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        color: #e9f2ff;
+        text-shadow: 0 2px 4px #000b;
+        pointer-events: none;
+      }
+      .tip {
+        position: absolute;
+        inset: auto 12px 10px;
+        color: #d5e4ff;
+        font-size: 14px;
+        text-shadow: 0 2px 4px #000b;
+        pointer-events: none;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        background: #0008;
+        color: #f2f7ff;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .overlay.show { opacity: 1; pointer-events: auto; }
+      button {
+        margin-top: 10px;
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: #8db3ff;
+        color: #102040;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <canvas id="game" width="1120" height="630"></canvas>
+      <div class="hud">
+        <span id="castle">Castle HP: 20</span>
+        <span id="gold">Gold: 120</span>
+        <span id="wave">Wave: 1</span>
+        <span id="slain">Slimes Defeated: 0</span>
+      </div>
+      <div class="tip">Click grass to place a tower (40 gold). Every 5th wave is a giant slime boss.</div>
+      <div id="overlay" class="overlay">
+        <div>
+          <h2 id="endTitle">Game Over</h2>
+          <p id="endText">The slimes reached your castle.</p>
+          <button id="restart">Play Again</button>
+        </div>
+      </div>
+    </main>
+    <script>
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const labels = {
+        castle: document.getElementById('castle'),
+        gold: document.getElementById('gold'),
+        wave: document.getElementById('wave'),
+        slain: document.getElementById('slain'),
+      };
+      const overlay = document.getElementById('overlay');
+      const endTitle = document.getElementById('endTitle');
+      const endText = document.getElementById('endText');
+      const restart = document.getElementById('restart');
+
+      const path = [
+        { x: 20, y: 320 }, { x: 190, y: 320 }, { x: 190, y: 160 },
+        { x: 420, y: 160 }, { x: 420, y: 470 }, { x: 700, y: 470 },
+        { x: 700, y: 260 }, { x: 900, y: 260 }, { x: 900, y: 380 },
+        { x: 1030, y: 380 }
+      ];
+
+      const state = {
+        castleHp: 20,
+        gold: 120,
+        wave: 1,
+        slain: 0,
+        towers: [],
+        shots: [],
+        slimes: [],
+        spawnLeft: 0,
+        spawnTimer: 0,
+        intermission: 0.8,
+        ended: false,
+      };
+
+      function reset() {
+        Object.assign(state, {
+          castleHp: 20, gold: 120, wave: 1, slain: 0,
+          towers: [], shots: [], slimes: [], spawnLeft: 0,
+          spawnTimer: 0, intermission: 0.8, ended: false,
+        });
+        overlay.classList.remove('show');
+        beginWave();
+        syncHud();
+      }
+
+      function syncHud() {
+        labels.castle.textContent = `Castle HP: ${state.castleHp}`;
+        labels.gold.textContent = `Gold: ${state.gold}`;
+        labels.wave.textContent = `Wave: ${state.wave}`;
+        labels.slain.textContent = `Slimes Defeated: ${state.slain}`;
+      }
+
+      function waveInfo(num) {
+        const boss = num % 5 === 0;
+        if (boss) return { count: 1, hp: 300 + num * 40, speed: 42 + num * 1.5, boss: true };
+        return { count: 5 + num * 2, hp: 34 + num * 10, speed: 55 + num * 1.8, boss: false };
+      }
+
+      function beginWave() {
+        const info = waveInfo(state.wave);
+        state.spawnLeft = info.count;
+        state.spawnTimer = 0;
+        state.waveSpec = info;
+        syncHud();
+      }
+
+      function spawnSlime() {
+        const spec = state.waveSpec;
+        state.slimes.push({
+          x: path[0].x,
+          y: path[0].y,
+          hp: spec.hp,
+          maxHp: spec.hp,
+          speed: spec.speed,
+          pathIndex: 1,
+          radius: spec.boss ? 33 : 16,
+          boss: spec.boss,
+          damage: spec.boss ? 6 : 1,
+        });
+      }
+
+      function placeTower(x, y) {
+        if (state.ended || state.gold < 40) return;
+        for (const node of path) if (Math.hypot(x - node.x, y - node.y) < 78) return;
+        if (state.towers.some(t => Math.hypot(t.x - x, t.y - y) < 42)) return;
+        state.towers.push({ x, y, cooldown: 0 });
+        state.gold -= 40;
+        syncHud();
+      }
+
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        placeTower(x, y);
+      });
+
+      function update(dt) {
+        if (state.ended) return;
+
+        state.intermission -= dt;
+        if (state.intermission <= 0) {
+          if (state.spawnLeft > 0) {
+            state.spawnTimer -= dt;
+            if (state.spawnTimer <= 0) {
+              spawnSlime();
+              state.spawnLeft -= 1;
+              state.spawnTimer = state.waveSpec.boss ? 1.2 : 0.55;
+            }
+          } else if (state.slimes.length === 0) {
+            state.wave += 1;
+            state.gold += 30;
+            state.intermission = 1.2;
+            beginWave();
+          }
+        }
+
+        for (const slime of state.slimes) {
+          const target = path[slime.pathIndex];
+          const dx = target.x - slime.x;
+          const dy = target.y - slime.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const step = slime.speed * dt;
+          if (dist <= step) {
+            slime.x = target.x;
+            slime.y = target.y;
+            slime.pathIndex += 1;
+            if (slime.pathIndex >= path.length) {
+              slime.reached = true;
+              state.castleHp -= slime.damage;
+            }
+          } else {
+            slime.x += (dx / dist) * step;
+            slime.y += (dy / dist) * step;
+          }
+        }
+
+        for (const tower of state.towers) {
+          tower.cooldown -= dt;
+          if (tower.cooldown > 0) continue;
+          let target = null;
+          let best = Infinity;
+          for (const slime of state.slimes) {
+            const d = Math.hypot(tower.x - slime.x, tower.y - slime.y);
+            if (d < 185 && d < best) { best = d; target = slime; }
+          }
+          if (!target) continue;
+          const angle = Math.atan2(target.y - tower.y, target.x - tower.x);
+          state.shots.push({ x: tower.x, y: tower.y, vx: Math.cos(angle) * 360, vy: Math.sin(angle) * 360, dmg: 24, r: 4 });
+          tower.cooldown = 0.55;
+        }
+
+        for (const shot of state.shots) {
+          shot.x += shot.vx * dt;
+          shot.y += shot.vy * dt;
+          for (const slime of state.slimes) {
+            if (slime.reached || slime.dead) continue;
+            if (Math.hypot(shot.x - slime.x, shot.y - slime.y) < slime.radius + shot.r) {
+              slime.hp -= shot.dmg;
+              shot.dead = true;
+              if (slime.hp <= 0) {
+                slime.dead = true;
+                state.gold += slime.boss ? 70 : 9;
+                state.slain += 1;
+              }
+              break;
+            }
+          }
+        }
+
+        state.slimes = state.slimes.filter(s => !s.dead && !s.reached);
+        state.shots = state.shots.filter(s => !s.dead && s.x > -20 && s.y > -20 && s.x < canvas.width + 20 && s.y < canvas.height + 20);
+
+        if (state.castleHp <= 0) {
+          state.ended = true;
+          endTitle.textContent = 'Castle Overrun';
+          endText.textContent = `You reached wave ${state.wave}.`;
+          overlay.classList.add('show');
+        }
+        syncHud();
+      }
+
+      function drawPath() {
+        ctx.lineWidth = 58;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#8f7d5f';
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+        ctx.stroke();
+      }
+
+      function drawCastle() {
+        const x = 1060, y = 380;
+        ctx.fillStyle = '#4e7dff';
+        ctx.fillRect(x - 36, y - 64, 72, 64);
+        ctx.fillStyle = '#86a8ff';
+        ctx.fillRect(x - 42, y - 72, 84, 14);
+        ctx.fillStyle = '#385dc2';
+        ctx.fillRect(x - 12, y - 34, 24, 34);
+      }
+
+      function draw() {
+        ctx.fillStyle = '#274225';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawPath();
+        drawCastle();
+
+        for (const tower of state.towers) {
+          ctx.fillStyle = '#949494';
+          ctx.beginPath();
+          ctx.arc(tower.x, tower.y, 14, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#5f5f5f';
+          ctx.fillRect(tower.x - 5, tower.y - 20, 10, 14);
+        }
+
+        for (const shot of state.shots) {
+          ctx.fillStyle = '#e6f2ff';
+          ctx.beginPath();
+          ctx.arc(shot.x, shot.y, shot.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        for (const slime of state.slimes) {
+          ctx.fillStyle = slime.boss ? '#3cad48' : '#4fd65e';
+          ctx.beginPath();
+          ctx.arc(slime.x, slime.y, slime.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#2c8f38';
+          ctx.beginPath();
+          ctx.arc(slime.x - slime.radius * 0.3, slime.y - slime.radius * 0.15, slime.radius * 0.16, 0, Math.PI * 2);
+          ctx.arc(slime.x + slime.radius * 0.3, slime.y - slime.radius * 0.15, slime.radius * 0.16, 0, Math.PI * 2);
+          ctx.fill();
+
+          const width = slime.boss ? 70 : 34;
+          const hpRatio = Math.max(0, slime.hp / slime.maxHp);
+          ctx.fillStyle = '#0008';
+          ctx.fillRect(slime.x - width / 2, slime.y - slime.radius - 16, width, 6);
+          ctx.fillStyle = '#90ff84';
+          ctx.fillRect(slime.x - width / 2, slime.y - slime.radius - 16, width * hpRatio, 6);
+        }
+      }
+
+      let last = performance.now();
+      function loop(now) {
+        const dt = Math.min(0.033, (now - last) / 1000);
+        last = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      restart.addEventListener('click', reset);
+      reset();
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
